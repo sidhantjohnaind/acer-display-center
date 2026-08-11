@@ -60,7 +60,7 @@ export default class AcerMonitorExtension extends Extension {
         sysMenu.addMenuItem(headerItem);
         this._menuItems.push(headerItem);
 
-        // Brightness Slider
+        // Brightness Slider with rounded corners
         let brightTimeout = 0;
         let brightLabel = new PopupMenu.PopupMenuItem(`  Brightness (${state.brightness}%)`, { reactive: false });
         sysMenu.addMenuItem(brightLabel);
@@ -79,10 +79,11 @@ export default class AcerMonitorExtension extends Extension {
             });
         });
         brightSliderItem.add_child(brightSlider);
+        brightSliderItem.actor.set_style('border-radius: 18px; margin: 2px 8px; background-color: rgba(255, 255, 255, 0.05);');
         sysMenu.addMenuItem(brightSliderItem);
         this._menuItems.push(brightSliderItem);
 
-        // Contrast Slider
+        // Contrast Slider with rounded corners
         let contrastTimeout = 0;
         let contrastLabel = new PopupMenu.PopupMenuItem(`  Contrast (${state.contrast}%)`, { reactive: false });
         sysMenu.addMenuItem(contrastLabel);
@@ -101,12 +102,14 @@ export default class AcerMonitorExtension extends Extension {
             });
         });
         contrastSliderItem.add_child(contrastSlider);
+        contrastSliderItem.actor.set_style('border-radius: 18px; margin: 2px 8px; background-color: rgba(255, 255, 255, 0.05);');
         sysMenu.addMenuItem(contrastSliderItem);
         this._menuItems.push(contrastSliderItem);
 
-        // SubMenu Toggle for Presets (Like Wi-Fi / Bluetooth / Network toggle)
+        // SubMenu Toggle for Presets styled like Wired LAN / Wi-Fi rounded pill
         let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(`Presets (Active: ${state.mode_name})`, true);
         presetSubMenu.icon.icon_name = 'video-display-symbolic';
+        presetSubMenu.actor.set_style('border-radius: 22px; margin: 6px 8px; padding: 6px 12px; background-color: rgba(255, 255, 255, 0.1);');
         sysMenu.addMenuItem(presetSubMenu);
         this._menuItems.push(presetSubMenu);
 
