@@ -149,14 +149,12 @@ export default class AcerMonitorExtension extends Extension {
         const contrast = new AcerContrastSlider(state.contrast);
         const bright   = new AcerBrightnessSlider(state.brightness);
 
-        // Insert before the CURRENT first item so order ends up:
-        //   Brightness → Contrast → Preset → [native volume, tiles, power...]
-        //
-        // We insert in REVERSE order (each goes "before current first"):
-        const firstItem = sysMenu.getFirstItem();
-        sysMenu.insertItemBefore(preset,   firstItem, 1);
-        sysMenu.insertItemBefore(contrast, preset,    1);
-        sysMenu.insertItemBefore(bright,   contrast,  1);
+        // addItem() appends to the END of the grid.
+        // The native volume slider is the last item, so our controls
+        // appear right after it — grouped together with the sliders.
+        sysMenu.addItem(bright,   1);
+        sysMenu.addItem(contrast, 1);
+        sysMenu.addItem(preset,   1);
 
         this._items.push(bright, contrast, preset);
     }
