@@ -9,12 +9,12 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 
 function execCli(cmd) {
-    GLib.spawn_command_line_async(`/usr/local/bin/acer_monitor_cli ${cmd}`);
+    GLib.spawn_command_line_async(`/usr/local/bin/amctl ${cmd}`);
 }
 
 function getInitialState() {
     try {
-        let [res, stdout] = GLib.spawn_command_line_sync('/usr/local/bin/acer_monitor_cli info --json');
+        let [res, stdout] = GLib.spawn_command_line_sync('/usr/local/bin/amctl info --json');
         if (res && stdout) {
             let str = new TextDecoder().decode(stdout);
             let parsed = JSON.parse(str);
@@ -55,7 +55,7 @@ class AcerMonitorIndicator extends PanelMenu.Button {
             return Clutter.EVENT_STOP;
         });
 
-        let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control', { reactive: false });
+        let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control (amctl)', { reactive: false });
         this.menu.addMenuItem(titleItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -151,12 +151,12 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Hardware Presets (Verified VCP 0xE2)
+        // Hardware Presets (0xE2)
         let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
         let modes = [
-            { name: '  User / Custom Mode (0xE2: 0)', cmd: 'preset user' },
+            { name: '  User Mode (0xE2: 0)', cmd: 'preset user' },
             { name: '  Standard Mode (0xE2: 1)', cmd: 'preset standard' },
             { name: '  ECO Power Saver (0xE2: 2)', cmd: 'preset eco' },
             { name: '  Graphics Mode (0xE2: 3)', cmd: 'preset graphics' },

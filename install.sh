@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== Acer Monitor CLI & Service Installer (Linux) ==="
+echo "=== Acer Monitor Control (amctl) Installer (Linux) ==="
 
 # Build release binary if not present
 if [ ! -f "target/release/acer_monitor_cli" ]; then
@@ -9,17 +9,20 @@ if [ ! -f "target/release/acer_monitor_cli" ]; then
     cargo build --release
 fi
 
-# Determine target bin directory
 TARGET_DIR="/usr/local/bin"
 if [ -w "$TARGET_DIR" ]; then
     cp target/release/acer_monitor_cli "$TARGET_DIR/acer_monitor_cli"
     chmod +x "$TARGET_DIR/acer_monitor_cli"
-    echo "Installed binary to $TARGET_DIR/acer_monitor_cli"
+    ln -sf "$TARGET_DIR/acer_monitor_cli" "$TARGET_DIR/amctl"
+    ln -sf "$TARGET_DIR/acer_monitor_cli" "$TARGET_DIR/amc"
+    echo "Installed binary and 'amctl' symlink to $TARGET_DIR/"
 else
-    echo "Requesting sudo privileges to install binary to $TARGET_DIR..."
+    echo "Requesting sudo privileges to install amctl..."
     sudo cp target/release/acer_monitor_cli "$TARGET_DIR/acer_monitor_cli"
     sudo chmod +x "$TARGET_DIR/acer_monitor_cli"
-    echo "Installed binary to $TARGET_DIR/acer_monitor_cli"
+    sudo ln -sf "$TARGET_DIR/acer_monitor_cli" "$TARGET_DIR/amctl"
+    sudo ln -sf "$TARGET_DIR/acer_monitor_cli" "$TARGET_DIR/amc"
+    echo "Installed binary and 'amctl' symlink to $TARGET_DIR/"
 fi
 
 # Ensure i2c-dev module is loaded
@@ -34,4 +37,4 @@ acer_monitor_cli install-service || true
 
 echo ""
 echo "Installation complete!"
-echo "Run 'acer_monitor_cli --help' to get started."
+echo "Run 'amctl --help' to get started."
