@@ -28,25 +28,28 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "preset" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli preset <standard|eco|graphics|hdr|racing|sports|action|movie|0-7> [specifier]".to_string());
+                return Err("Usage: acer_monitor_cli preset <action|racing|sports|user|eco|reading|movie|graphics> [specifier]".to_string());
             }
             let preset_name = args[0].to_ascii_lowercase();
             let spec = parse_optional_specifier(&args[1..]);
 
-            let mode_val = match preset_name.as_str() {
-                "standard" | "normal" => 0,
-                "eco" => 1,
-                "graphics" => 2,
-                "hdr" | "user" => 3,
-                "racing" => 4,
-                "sports" => 5,
-                "action" | "gaming" => 6,
-                "movie" => 7,
-                other => parse_u32(other).unwrap_or_else(|_| 0),
-            };
-
-            with_monitor(spec, |mon| acer::display_mode(mon, mode_val))?;
-            Ok(format!("Applied hardware monitor preset '{preset_name}' (mode {mode_val})."))
+            with_monitor(spec, |mon| {
+                match preset_name.as_str() {
+                    "action" | "gaming" => acer::display_mode(mon, 0),
+                    "racing" => acer::display_mode(mon, 1),
+                    "sports" => acer::display_mode(mon, 2),
+                    "user" | "standard" | "hdr" => acer::display_mode(mon, 3),
+                    "eco" => acer::display_mode(mon, 4),
+                    "reading" | "text" => mon.set_vcp(0xDC, 0x02),
+                    "movie" | "cinema" => mon.set_vcp(0xDC, 0x03),
+                    "graphics" => mon.set_vcp(0xDC, 0x06),
+                    other => {
+                        let val = parse_u32(other)?;
+                        acer::display_mode(mon, val)
+                    }
+                }
+            })?;
+            Ok(format!("Applied hardware preset '{preset_name}'."))
         }
 
         "unlock" => {

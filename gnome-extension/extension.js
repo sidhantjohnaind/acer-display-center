@@ -151,19 +151,19 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // All 8 Hardware Mode Presets
-        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets (8 Modes)', { reactive: false });
+        // Corrected Hardware Modes
+        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
         let modes = [
-            { name: '  Mode 0: Standard Mode', cmd: 'preset standard' },
-            { name: '  Mode 1: ECO Power Saver', cmd: 'preset eco' },
-            { name: '  Mode 2: Graphics Mode', cmd: 'preset graphics' },
-            { name: '  Mode 3: HDR / User Mode', cmd: 'preset hdr' },
-            { name: '  Mode 4: Racing Mode', cmd: 'preset racing' },
-            { name: '  Mode 5: Sports Mode', cmd: 'preset sports' },
-            { name: '  Mode 6: Action Gaming Mode', cmd: 'preset action' },
-            { name: '  Mode 7: Movie Mode', cmd: 'preset movie' },
+            { name: '  Action Gaming Mode (0xE2: 0)', cmd: 'preset action' },
+            { name: '  Racing Mode (0xE2: 1)', cmd: 'preset racing' },
+            { name: '  Sports Mode (0xE2: 2)', cmd: 'preset sports' },
+            { name: '  User / Standard Mode (0xE2: 3)', cmd: 'preset user' },
+            { name: '  ECO Power Saver (0xE2: 4)', cmd: 'preset eco' },
+            { name: '  Reading / Text Mode (0xDC: 2)', cmd: 'preset reading' },
+            { name: '  Movie Mode (0xDC: 3)', cmd: 'preset movie' },
+            { name: '  Graphics Mode (0xDC: 6)', cmd: 'preset graphics' },
         ];
 
         for (let m of modes) {
