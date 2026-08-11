@@ -39,12 +39,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                     "standard" | "normal" => acer::display_mode(mon, 1),
                     "eco" => acer::display_mode(mon, 2),
                     "graphics" => acer::display_mode(mon, 3),
-                    "hdr" => {
-                        let _ = mon.set_vcp(0x0B, 1);
-                        let _ = mon.set_vcp(0x0C, 1);
-                        let _ = mon.set_vcp(0xB6, 2);
-                        acer::display_mode(mon, 4)
-                    }
+                    "hdr" => acer::raw_bank(mon, 0xE7, 8, 1),
                     "action" | "gaming" => acer::display_mode(mon, 5),
                     "racing" => acer::display_mode(mon, 6),
                     "sports" => acer::display_mode(mon, 7),
