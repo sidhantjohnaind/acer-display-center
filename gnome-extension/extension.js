@@ -5,7 +5,11 @@ import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
 import St from 'gi://St';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 
+/* ------------------------------------------------------------------ */
+/*  CLI helper                                                          */
+/* ------------------------------------------------------------------ */
 function execCli(cmd) {
     GLib.spawn_command_line_async(`/usr/local/bin/amctl ${cmd}`);
 }
@@ -16,19 +20,17 @@ function getInitialState() {
         if (res && stdout) {
             let str = new TextDecoder().decode(stdout);
             let parsed = JSON.parse(str);
-            if (parsed && parsed.current_values) {
-                let modeVal = parsed.current_values.display_mode
-                    ? parsed.current_values.display_mode.current : 1;
+            if (parsed?.current_values) {
+                let cv = parsed.current_values;
+                let modeVal = cv.display_mode?.current ?? 1;
                 let modeName = {
                     0: 'User', 1: 'Standard', 2: 'ECO', 3: 'Graphics',
                     5: 'Action', 6: 'Racing', 7: 'Sports', 11: 'HDR'
-                }[modeVal] || `Mode ${modeVal}`;
+                }[modeVal] ?? 'Standard';
                 return {
-                    brightness: parsed.current_values.brightness
-                        ? parsed.current_values.brightness.current : 80,
-                    contrast: parsed.current_values.contrast
-                        ? parsed.current_values.contrast.current : 50,
-                    mode_name: modeName,
+                    brightness: cv.brightness?.current ?? 80,
+                    contrast:   cv.contrast?.current   ?? 50,
+                    mode_name:  modeName,
                 };
             }
         }
@@ -36,114 +38,130 @@ function getInitialState() {
     return { brightness: 80, contrast: 50, mode_name: 'Standard' };
 }
 
-function makeSliderRow(iconName, value, onChange) {
-    let row = new St.BoxLayout({
-        style_class: 'quick-slider',
-        reactive: true,
-        x_expand: true,
-    });
-
-    let icon = new St.Icon({
-        icon_name: iconName,
-        style_class: 'quick-slider-icon',
-        y_align: Clutter.ActorAlign.CENTER,
-    });
-
-    let slider = new Slider.Slider(value / 100.0);
-    slider.x_expand = true;
-
-    let label = new St.Label({
-        text: `${value}%`,
-        y_align: Clutter.ActorAlign.CENTER,
-        style: 'min-width: 2.8em; text-align: right;',
-    });
-
-    let timeout = 0;
-    slider.connect('notify::value', () => {
-        let val = Math.round(slider.value * 100);
-        label.text = `${val}%`;
-        if (timeout) GLib.source_remove(timeout);
-        timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-            onChange(val);
-            timeout = 0;
-            return GLib.SOURCE_REMOVE;
+/* ------------------------------------------------------------------ */
+/*  Native-looking slider widget                                        */
+/*  Mirrors how GNOME 46's QuickSlider is built internally             */
+/* ------------------------------------------------------------------ */
+const AcerSlider = GObject.registerClass(
+class AcerSlider extends St.Widget {
+    _init(iconName, initialValue, onChange) {
+        super._init({
+            style_class: 'quick-slider',
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
         });
-    });
 
-    row.add_child(icon);
-    row.add_child(slider);
-    row.add_child(label);
-    return row;
-}
+        // Inner box — same structure as native QuickSlider
+        this._box = new St.BoxLayout({ x_expand: true });
+        this.add_child(this._box);
 
+        this._icon = new St.Icon({
+            icon_name: iconName,
+            style_class: 'quick-slider-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._box.add_child(this._icon);
+
+        this._slider = new Slider.Slider(initialValue / 100.0);
+        this._slider.x_expand = true;
+        this._box.add_child(this._slider);
+
+        this._timeout = 0;
+        this._slider.connect('notify::value', () => {
+            let val = Math.round(this._slider.value * 100);
+            if (this._timeout) GLib.source_remove(this._timeout);
+            this._timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 120, () => {
+                onChange(val);
+                this._timeout = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+    }
+
+    destroy() {
+        if (this._timeout) {
+            GLib.source_remove(this._timeout);
+            this._timeout = 0;
+        }
+        super.destroy();
+    }
+});
+
+/* ------------------------------------------------------------------ */
+/*  Extension                                                           */
+/* ------------------------------------------------------------------ */
 export default class AcerMonitorExtension extends Extension {
     enable() {
         let state = getInitialState();
-        let qs = Main.panel.statusArea.quickSettings;
-        let menuBox = qs.menu.box;
+        let qs    = Main.panel.statusArea.quickSettings;
+        let grid  = qs._grid;          // The actual St.Widget grid
+        let lm    = grid.layout_manager;
 
-        this._widgets = [];
+        this._inGrid = [];
+        this._inMenu = [];
 
-        // === Container for sliders — inserted BEFORE the grid (index 0 in menuBox) ===
-        let sliderContainer = new St.BoxLayout({
-            vertical: true,
-            x_expand: true,
-            style: 'margin: 0; padding: 0;',
-        });
-
-        // Brightness
-        sliderContainer.add_child(makeSliderRow(
+        // --- Brightness slider (inserted at grid position 0) ---
+        this._bright = new AcerSlider(
             'display-brightness-symbolic',
             state.brightness,
-            (val) => execCli(`brightness ${val}`)
-        ));
+            val => execCli(`brightness ${val}`)
+        );
+        grid.insert_child_at_index(this._bright, 0);
+        try { lm.set_column_span(this._bright, 2); } catch (_) {}
+        this._inGrid.push(this._bright);
 
-        // Contrast
-        sliderContainer.add_child(makeSliderRow(
+        // --- Contrast slider (inserted at grid position 1) ---
+        this._contrast = new AcerSlider(
             'display-symbolic',
             state.contrast,
-            (val) => execCli(`contrast ${val}`)
-        ));
+            val => execCli(`contrast ${val}`)
+        );
+        grid.insert_child_at_index(this._contrast, 1);
+        try { lm.set_column_span(this._contrast, 2); } catch (_) {}
+        this._inGrid.push(this._contrast);
 
-        // Insert BEFORE everything else in the menu box (above the grid)
-        menuBox.insert_child_at_index(sliderContainer, 0);
-        this._widgets.push(sliderContainer);
-
-        // === Preset SubMenu — added to sysMenu at position 0 ===
-        // (appears as a pill below the grid, similar to other popup items)
-        let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(
+        // --- Preset toggle (native PopupSubMenuMenuItem pill) ---
+        this._preset = new PopupMenu.PopupSubMenuMenuItem(
             `Preset: ${state.mode_name}`, true
         );
-        presetSubMenu.icon.icon_name = 'video-display-symbolic';
+        this._preset.icon.icon_name = 'video-display-symbolic';
 
         const MODES = [
-            { label: 'User Mode',       short: 'User',     cmd: 'preset user' },
+            { label: 'User Mode',       short: 'User',     cmd: 'preset user'     },
             { label: 'Standard Mode',   short: 'Standard', cmd: 'preset standard' },
-            { label: 'ECO Power Saver', short: 'ECO',      cmd: 'preset eco' },
+            { label: 'ECO Power Saver', short: 'ECO',      cmd: 'preset eco'      },
             { label: 'Graphics Mode',   short: 'Graphics', cmd: 'preset graphics' },
-            { label: 'HDR Mode',        short: 'HDR',      cmd: 'preset hdr' },
-            { label: 'Action Gaming',   short: 'Action',   cmd: 'preset action' },
-            { label: 'Racing Mode',     short: 'Racing',   cmd: 'preset racing' },
-            { label: 'Sports Mode',     short: 'Sports',   cmd: 'preset sports' },
+            { label: 'HDR Mode',        short: 'HDR',      cmd: 'preset hdr'      },
+            { label: 'Action Gaming',   short: 'Action',   cmd: 'preset action'   },
+            { label: 'Racing Mode',     short: 'Racing',   cmd: 'preset racing'   },
+            { label: 'Sports Mode',     short: 'Sports',   cmd: 'preset sports'   },
         ];
 
         for (let m of MODES) {
             let item = new PopupMenu.PopupMenuItem(m.label);
             item.connect('activate', () => {
                 execCli(m.cmd);
-                presetSubMenu.label.text = `Preset: ${m.short}`;
+                this._preset.label.text = `Preset: ${m.short}`;
             });
-            presetSubMenu.menu.addMenuItem(item);
+            this._preset.menu.addMenuItem(item);
         }
 
-        qs.menu.addMenuItem(presetSubMenu, 0);
-        this._widgets.push(presetSubMenu);
+        // Add preset to the QuickSettings popup menu (shows below grid, native behaviour)
+        qs.menu.addMenuItem(this._preset, 0);
+        this._inMenu.push(this._preset);
     }
 
     disable() {
-        for (let w of this._widgets ?? []) {
+        // Remove grid items (St.Widget — remove from parent)
+        for (let w of this._inGrid ?? []) {
             w.destroy();
         }
-        this._widgets = [];
+        this._inGrid = [];
+
+        // Remove menu items
+        for (let w of this._inMenu ?? []) {
+            w.destroy();
+        }
+        this._inMenu = [];
     }
 }
