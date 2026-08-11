@@ -109,13 +109,25 @@ export default class AcerMonitorExtension extends Extension {
 
         this._items = [];
 
+        // Find where the tile grid lives inside the menu box.
+        // Insert our sliders just BEFORE it — anything above the grid
+        // (system section, power button) stays untouched at the top.
+        let gridIndex = 0;
+        let boxChildren = box.get_children();
+        for (let i = 0; i < boxChildren.length; i++) {
+            if (boxChildren[i] === qs._grid) {
+                gridIndex = i;
+                break;
+            }
+        }
+
         // === Brightness slider ===
         let bright = new AcerSlider(
             'display-brightness-symbolic',
             state.brightness,
             val => execCli(`brightness ${val}`)
         );
-        box.insert_child_at_index(bright, 0);
+        box.insert_child_at_index(bright, gridIndex);
         this._items.push(bright);
 
         // === Contrast slider ===
@@ -124,7 +136,7 @@ export default class AcerMonitorExtension extends Extension {
             state.contrast,
             val => execCli(`contrast ${val}`)
         );
-        box.insert_child_at_index(contrast, 1);
+        box.insert_child_at_index(contrast, gridIndex + 1);
         this._items.push(contrast);
 
         // === Preset submenu (native pill via PopupMenu) ===
