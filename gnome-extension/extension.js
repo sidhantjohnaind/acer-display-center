@@ -32,9 +32,8 @@ function getInitialState() {
 const AcerBrightnessSlider = GObject.registerClass(
 class AcerBrightnessSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
-        super._init({
-            iconName: 'display-brightness-symbolic',
-        });
+        super._init();
+        this.iconName = 'display-brightness-symbolic';
         this.slider.value = initialVal / 100.0;
 
         let timeout = 0;
@@ -54,9 +53,8 @@ class AcerBrightnessSlider extends QuickSettings.QuickSlider {
 const AcerContrastSlider = GObject.registerClass(
 class AcerContrastSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
-        super._init({
-            iconName: 'display-symbolic',
-        });
+        super._init();
+        this.iconName = 'display-symbolic';
         this.slider.value = initialVal / 100.0;
 
         let timeout = 0;
@@ -76,9 +74,8 @@ class AcerContrastSlider extends QuickSettings.QuickSlider {
 const AcerVolumeSlider = GObject.registerClass(
 class AcerVolumeSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
-        super._init({
-            iconName: 'audio-speakers-symbolic',
-        });
+        super._init();
+        this.iconName = 'audio-speakers-symbolic';
         this.slider.value = initialVal / 100.0;
 
         let timeout = 0;
