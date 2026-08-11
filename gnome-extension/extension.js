@@ -129,9 +129,9 @@ export default class AcerMonitorExtension extends Extension {
         this._volumeSlider = new AcerVolumeSlider(state.volume);
         this._presetsToggle = new AcerPresetsToggle();
 
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._brightSlider);
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._contrastSlider);
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._volumeSlider);
+        Main.panel.statusArea.quickSettings.addItem(this._brightSlider);
+        Main.panel.statusArea.quickSettings.addItem(this._contrastSlider);
+        Main.panel.statusArea.quickSettings.addItem(this._volumeSlider);
         Main.panel.statusArea.quickSettings.addItem(this._presetsToggle);
     }
 
