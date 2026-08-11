@@ -34,7 +34,6 @@ class AcerBrightnessSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
         super._init({
             iconName: 'display-brightness-symbolic',
-            title: 'Monitor Brightness',
         });
         this.slider.value = initialVal / 100.0;
 
@@ -57,7 +56,6 @@ class AcerContrastSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
         super._init({
             iconName: 'display-symbolic',
-            title: 'Monitor Contrast',
         });
         this.slider.value = initialVal / 100.0;
 
@@ -80,7 +78,6 @@ class AcerVolumeSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
         super._init({
             iconName: 'audio-speakers-symbolic',
-            title: 'Monitor Volume',
         });
         this.slider.value = initialVal / 100.0;
 
@@ -102,12 +99,12 @@ const AcerPresetsToggle = GObject.registerClass(
 class AcerPresetsToggle extends QuickSettings.QuickMenuToggle {
     _init() {
         super._init({
-            title: 'Monitor Presets',
+            title: 'Presets',
             iconName: 'video-display-symbolic',
             toggleMode: false,
         });
 
-        this.menu.setHeader('video-display-symbolic', 'Monitor Presets');
+        this.menu.setHeader('video-display-symbolic', 'Presets');
 
         let modes = [
             { name: 'User Mode', cmd: 'preset user' },
