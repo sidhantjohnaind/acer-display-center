@@ -43,7 +43,7 @@ function getInitialState() {
     return { brightness: 80, contrast: 50, volume: 100, display_mode: 1, mode_name: 'Standard' };
 }
 
-// Full-width Brightness Slider
+// Full-width Brightness Slider in QuickSettings
 const AcerBrightnessSlider = GObject.registerClass(
 class AcerBrightnessSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
@@ -64,7 +64,7 @@ class AcerBrightnessSlider extends QuickSettings.QuickSlider {
     }
 });
 
-// Full-width Contrast Slider
+// Full-width Contrast Slider in QuickSettings
 const AcerContrastSlider = GObject.registerClass(
 class AcerContrastSlider extends QuickSettings.QuickSlider {
     _init(initialVal) {
@@ -125,21 +125,10 @@ export default class AcerMonitorExtension extends Extension {
         this._contrastSlider = new AcerContrastSlider(state.contrast);
         this._presetsToggle = new AcerPresetsToggle(state.mode_name);
 
-        let grid = Main.panel.statusArea.quickSettings._grid;
-
-        // Insert sliders at the very top (indices 0 & 1) spanning 2 columns (full width)!
-        grid.insert_child_at_index(this._brightSlider, 0);
-        grid.insert_child_at_index(this._contrastSlider, 1);
-
-        try {
-            grid.set_child_packing(this._brightSlider, true, true, 2, 0);
-            grid.set_child_packing(this._contrastSlider, true, true, 2, 0);
-        } catch (e) {
-            // Fallback for GNOME layout packing
-        }
-
-        // Add Presets pill button to the grid
-        Main.panel.statusArea.quickSettings.addItem(this._presetsToggle);
+        // colSpan = 2 forces 100% full width across the QuickSettings menu!
+        Main.panel.statusArea.quickSettings.addItem(this._brightSlider, 2);
+        Main.panel.statusArea.quickSettings.addItem(this._contrastSlider, 2);
+        Main.panel.statusArea.quickSettings.addItem(this._presetsToggle, 1);
     }
 
     disable() {
