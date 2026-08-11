@@ -1,7 +1,11 @@
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
+import St from 'gi://St';
 import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 
 function execCli(cmd) {
@@ -23,122 +27,163 @@ function getInitialState() {
             }
         }
     } catch (e) {
-        console.error(`AcerMonitor QuickSettings error: ${e}`);
+        console.error(`AcerMonitor state error: ${e}`);
     }
     return { brightness: 80, contrast: 50, volume: 100 };
 }
 
-// Brightness Slider in QuickSettings
-const AcerBrightnessSlider = GObject.registerClass(
-class AcerBrightnessSlider extends QuickSettings.QuickSlider {
-    _init(initialVal) {
-        super._init();
-        this.iconName = 'display-brightness-symbolic';
-        this.slider.value = initialVal / 100.0;
-
-        let timeout = 0;
-        this.slider.connect('notify::value', () => {
-            let val = Math.round(this.slider.value * 100);
-            if (timeout) GLib.source_remove(timeout);
-            timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                execCli(`brightness ${val}`);
-                timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-    }
-});
-
-// Contrast Slider in QuickSettings
-const AcerContrastSlider = GObject.registerClass(
-class AcerContrastSlider extends QuickSettings.QuickSlider {
-    _init(initialVal) {
-        super._init();
-        this.iconName = 'display-symbolic';
-        this.slider.value = initialVal / 100.0;
-
-        let timeout = 0;
-        this.slider.connect('notify::value', () => {
-            let val = Math.round(this.slider.value * 100);
-            if (timeout) GLib.source_remove(timeout);
-            timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                execCli(`contrast ${val}`);
-                timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-    }
-});
-
-// Volume Slider in QuickSettings
-const AcerVolumeSlider = GObject.registerClass(
-class AcerVolumeSlider extends QuickSettings.QuickSlider {
-    _init(initialVal) {
-        super._init();
-        this.iconName = 'audio-speakers-symbolic';
-        this.slider.value = initialVal / 100.0;
-
-        let timeout = 0;
-        this.slider.connect('notify::value', () => {
-            let val = Math.round(this.slider.value * 100);
-            if (timeout) GLib.source_remove(timeout);
-            timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                execCli(`volume ${val}`);
-                timeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-    }
-});
-
-// Presets Menu Toggle in QuickSettings
-const AcerPresetsToggle = GObject.registerClass(
-class AcerPresetsToggle extends QuickSettings.QuickMenuToggle {
+const AcerMonitorIndicator = GObject.registerClass(
+class AcerMonitorIndicator extends PanelMenu.Button {
     _init() {
-        super._init({
-            title: 'Presets',
-            iconName: 'video-display-symbolic',
-            toggleMode: false,
+        super._init(0.0, 'Acer Monitor Control', false);
+
+        let state = getInitialState();
+
+        let icon = new St.Icon({
+            icon_name: 'display-symbolic',
+            style_class: 'system-status-icon',
+        });
+        this.add_child(icon);
+
+        this.connect('scroll-event', (actor, event) => {
+            let direction = event.get_scroll_direction();
+            if (direction === Clutter.ScrollDirection.UP) {
+                execCli('brightness +5 --osd');
+            } else if (direction === Clutter.ScrollDirection.DOWN) {
+                execCli('brightness -5 --osd');
+            }
+            return Clutter.EVENT_STOP;
         });
 
-        this.menu.setHeader('video-display-symbolic', 'Presets');
+        let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control', { reactive: false });
+        this.menu.addMenuItem(titleItem);
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Brightness Section
+        let brightTimeout = 0;
+        let brightLabelItem = new PopupMenu.PopupMenuItem(`Brightness (${state.brightness}%)`, { reactive: false });
+        this.menu.addMenuItem(brightLabelItem);
+
+        let brightSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
+        let brightSlider = new Slider.Slider(state.brightness / 100.0);
+
+        let applyBrightness = () => {
+            let val = Math.round(brightSlider.value * 100);
+            brightLabelItem.label.set_text(`Brightness (${val}%)`);
+            execCli(`brightness ${val}`);
+        };
+
+        brightSlider.connect('drag-end', applyBrightness);
+        brightSlider.connect('notify::value', () => {
+            let val = Math.round(brightSlider.value * 100);
+            brightLabelItem.label.set_text(`Brightness (${val}%)`);
+            if (brightTimeout) {
+                GLib.source_remove(brightTimeout);
+            }
+            brightTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+                execCli(`brightness ${val}`);
+                brightTimeout = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        brightSliderItem.add_child(brightSlider);
+        this.menu.addMenuItem(brightSliderItem);
+
+        // Contrast Section
+        let contrastTimeout = 0;
+        let contrastLabelItem = new PopupMenu.PopupMenuItem(`Contrast (${state.contrast}%)`, { reactive: false });
+        this.menu.addMenuItem(contrastLabelItem);
+
+        let contrastSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
+        let contrastSlider = new Slider.Slider(state.contrast / 100.0);
+
+        let applyContrast = () => {
+            let val = Math.round(contrastSlider.value * 100);
+            contrastLabelItem.label.set_text(`Contrast (${val}%)`);
+            execCli(`contrast ${val}`);
+        };
+
+        contrastSlider.connect('drag-end', applyContrast);
+        contrastSlider.connect('notify::value', () => {
+            let val = Math.round(contrastSlider.value * 100);
+            contrastLabelItem.label.set_text(`Contrast (${val}%)`);
+            if (contrastTimeout) {
+                GLib.source_remove(contrastTimeout);
+            }
+            contrastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+                execCli(`contrast ${val}`);
+                contrastTimeout = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        contrastSliderItem.add_child(contrastSlider);
+        this.menu.addMenuItem(contrastSliderItem);
+
+        // Volume Section
+        let volumeTimeout = 0;
+        let volumeLabelItem = new PopupMenu.PopupMenuItem(`Volume (${state.volume}%)`, { reactive: false });
+        this.menu.addMenuItem(volumeLabelItem);
+
+        let volumeSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
+        let volumeSlider = new Slider.Slider(state.volume / 100.0);
+
+        let applyVolume = () => {
+            let val = Math.round(volumeSlider.value * 100);
+            volumeLabelItem.label.set_text(`Volume (${val}%)`);
+            execCli(`volume ${val}`);
+        };
+
+        volumeSlider.connect('drag-end', applyVolume);
+        volumeSlider.connect('notify::value', () => {
+            let val = Math.round(volumeSlider.value * 100);
+            volumeLabelItem.label.set_text(`Volume (${val}%)`);
+            if (volumeTimeout) {
+                GLib.source_remove(volumeTimeout);
+            }
+            volumeTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+                execCli(`volume ${val}`);
+                volumeTimeout = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        volumeSliderItem.add_child(volumeSlider);
+        this.menu.addMenuItem(volumeSliderItem);
+
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Presets Header
+        let presetHeader = new PopupMenu.PopupMenuItem('Presets', { reactive: false });
+        this.menu.addMenuItem(presetHeader);
 
         let modes = [
-            { name: 'User Mode', cmd: 'preset user' },
-            { name: 'Standard Mode', cmd: 'preset standard' },
-            { name: 'ECO Power Saver', cmd: 'preset eco' },
-            { name: 'Graphics Mode', cmd: 'preset graphics' },
-            { name: 'HDR Mode', cmd: 'preset hdr' },
-            { name: 'Action Gaming', cmd: 'preset action' },
-            { name: 'Racing Mode', cmd: 'preset racing' },
-            { name: 'Sports Mode', cmd: 'preset sports' },
+            { name: '  User Mode', cmd: 'preset user' },
+            { name: '  Standard Mode', cmd: 'preset standard' },
+            { name: '  ECO Power Saver', cmd: 'preset eco' },
+            { name: '  Graphics Mode', cmd: 'preset graphics' },
+            { name: '  HDR Mode', cmd: 'preset hdr' },
+            { name: '  Action Gaming', cmd: 'preset action' },
+            { name: '  Racing Mode', cmd: 'preset racing' },
+            { name: '  Sports Mode', cmd: 'preset sports' },
         ];
 
         for (let m of modes) {
-            this.menu.addAction(m.name, () => execCli(m.cmd));
+            let item = new PopupMenu.PopupMenuItem(m.name);
+            item.connect('activate', () => execCli(m.cmd));
+            this.menu.addMenuItem(item);
         }
     }
 });
 
 export default class AcerMonitorExtension extends Extension {
     enable() {
-        let state = getInitialState();
-
-        this._brightSlider = new AcerBrightnessSlider(state.brightness);
-        this._contrastSlider = new AcerContrastSlider(state.contrast);
-        this._volumeSlider = new AcerVolumeSlider(state.volume);
-        this._presetsToggle = new AcerPresetsToggle();
-
-        Main.panel.statusArea.quickSettings.addItem(this._brightSlider);
-        Main.panel.statusArea.quickSettings.addItem(this._contrastSlider);
-        Main.panel.statusArea.quickSettings.addItem(this._volumeSlider);
-        Main.panel.statusArea.quickSettings.addItem(this._presetsToggle);
+        this._indicator = new AcerMonitorIndicator();
+        Main.panel.addToStatusArea(this.uuid, this._indicator);
     }
 
     disable() {
-        if (this._brightSlider) { this._brightSlider.destroy(); this._brightSlider = null; }
-        if (this._contrastSlider) { this._contrastSlider.destroy(); this._contrastSlider = null; }
-        if (this._volumeSlider) { this._volumeSlider.destroy(); this._volumeSlider = null; }
-        if (this._presetsToggle) { this._presetsToggle.destroy(); this._presetsToggle = null; }
+        if (this._indicator) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
     }
 }
