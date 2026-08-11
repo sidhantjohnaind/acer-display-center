@@ -104,30 +104,30 @@ export default class AcerMonitorExtension extends Extension {
         sysMenu.addMenuItem(contrastSliderItem);
         this._menuItems.push(contrastSliderItem);
 
-        // Presets Header & Submenu Items
-        let presetHeader = new PopupMenu.PopupMenuItem(`  Presets (Active: ${state.mode_name})`, { reactive: false });
-        sysMenu.addMenuItem(presetHeader);
-        this._menuItems.push(presetHeader);
+        // SubMenu Toggle for Presets (Like Wi-Fi / Bluetooth / Network toggle)
+        let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(`Presets (Active: ${state.mode_name})`, true);
+        presetSubMenu.icon.icon_name = 'video-display-symbolic';
+        sysMenu.addMenuItem(presetSubMenu);
+        this._menuItems.push(presetSubMenu);
 
         let modes = [
-            { label: '    User Mode', shortName: 'User', cmd: 'preset user' },
-            { label: '    Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
-            { label: '    ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
-            { label: '    Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
-            { label: '    HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
-            { label: '    Action Gaming', shortName: 'Action', cmd: 'preset action' },
-            { label: '    Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
-            { label: '    Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
+            { label: 'User Mode', shortName: 'User', cmd: 'preset user' },
+            { label: 'Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
+            { label: 'ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
+            { label: 'Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
+            { label: 'HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
+            { label: 'Action Gaming', shortName: 'Action', cmd: 'preset action' },
+            { label: 'Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
+            { label: 'Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
         ];
 
         for (let m of modes) {
             let item = new PopupMenu.PopupMenuItem(m.label);
             item.connect('activate', () => {
                 execCli(m.cmd);
-                presetHeader.label.set_text(`  Presets (Active: ${m.shortName})`);
+                presetSubMenu.label.set_text(`Presets (Active: ${m.shortName})`);
             });
-            sysMenu.addMenuItem(item);
-            this._menuItems.push(item);
+            presetSubMenu.menu.addMenuItem(item);
         }
     }
 
