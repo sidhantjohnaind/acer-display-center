@@ -1,0 +1,17 @@
+[package]
+name = "acer_monitor_cli"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ddc = "0.2"
+ddc-i2c = { version = "0.2.2", features = ["i2c-linux"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
