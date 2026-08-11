@@ -106,7 +106,7 @@ export default class AcerMonitorExtension extends Extension {
         sysMenu.addMenuItem(contrastSliderItem);
         this._menuItems.push(contrastSliderItem);
 
-        // SubMenu Toggle for Presets styled like Wired LAN / Wi-Fi rounded pill
+        // SubMenu Toggle for Presets styled like Wired LAN / Wi-Fi rounded pill (Exactly 8 Hardware Modes)
         let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(`Presets (Active: ${state.mode_name})`, true);
         presetSubMenu.icon.icon_name = 'video-display-symbolic';
         presetSubMenu.actor.set_style('border-radius: 22px; margin: 6px 8px; padding: 6px 12px; background-color: rgba(255, 255, 255, 0.1);');
@@ -116,15 +116,12 @@ export default class AcerMonitorExtension extends Extension {
         let modes = [
             { label: '  User Mode', shortName: 'User', cmd: 'preset user' },
             { label: '  Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
-            { label: '🌱 ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
-            { label: '📖 Reading / BlueLight Mode', shortName: 'Reading', cmd: 'preset reading' },
-            { label: '🌙 Dark Night Mode', shortName: 'Dark', cmd: 'bluelight 4' },
-            { label: '🎨 Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
-            { label: '✨ HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
-            { label: '🎬 Movie / Cinema Mode', shortName: 'Movie', cmd: 'preset movie' },
-            { label: '🎮 Action Gaming', shortName: 'Action', cmd: 'preset action' },
-            { label: '🏎️ Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
-            { label: '⚽ Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
+            { label: '  ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
+            { label: '  Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
+            { label: '  HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
+            { label: '  Action Gaming', shortName: 'Action', cmd: 'preset action' },
+            { label: '  Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
+            { label: '  Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
         ];
 
         for (let m of modes) {
