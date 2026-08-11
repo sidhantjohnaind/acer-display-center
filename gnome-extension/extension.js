@@ -1,8 +1,12 @@
-const { Clutter, GLib, St, GObject } = imports.gi;
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
-const Slider = imports.ui.slider;
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
+import St from 'gi://St';
+import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 
 function execCli(cmd) {
     try {
@@ -17,14 +21,12 @@ class AcerMonitorIndicator extends PanelMenu.Button {
     _init() {
         super._init(0.0, 'Acer Monitor Control', false);
 
-        // Icon in top panel
         let icon = new St.Icon({
             icon_name: 'display-symbolic',
             style_class: 'system-status-icon',
         });
         this.add_child(icon);
 
-        // Scroll listener on panel icon
         this.connect('scroll-event', (actor, event) => {
             let direction = event.get_scroll_direction();
             if (direction === Clutter.ScrollDirection.UP) {
@@ -35,12 +37,10 @@ class AcerMonitorIndicator extends PanelMenu.Button {
             return Clutter.EVENT_STOP;
         });
 
-        // Popup Title
         let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control', { reactive: false });
         this.menu.addMenuItem(titleItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Brightness Slider
         let brightBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
         let brightLabel = new St.Label({ text: 'Brightness', y_align: Clutter.ActorAlign.CENTER });
         let brightSlider = new Slider.Slider(0.8);
@@ -54,7 +54,6 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         brightItem.add_child(brightBox);
         this.menu.addMenuItem(brightItem);
 
-        // Contrast Slider
         let contrastBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
         let contrastLabel = new St.Label({ text: 'Contrast', y_align: Clutter.ActorAlign.CENTER });
         let contrastSlider = new Slider.Slider(0.5);
@@ -68,7 +67,6 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         contrastItem.add_child(contrastBox);
         this.menu.addMenuItem(contrastItem);
 
-        // Volume Slider
         let volumeBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
         let volumeLabel = new St.Label({ text: 'Volume', y_align: Clutter.ActorAlign.CENTER });
         let volumeSlider = new Slider.Slider(1.0);
@@ -84,7 +82,6 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Hardware Preset Buttons
         let presetHeader = new PopupMenu.PopupMenuItem('Mode Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
@@ -106,18 +103,16 @@ class AcerMonitorIndicator extends PanelMenu.Button {
     }
 });
 
-let indicator;
+export default class AcerMonitorExtension extends Extension {
+    enable() {
+        this._indicator = new AcerMonitorIndicator();
+        Main.panel.addToStatusArea(this.uuid, this._indicator);
+    }
 
-function init() {}
-
-function enable() {
-    indicator = new AcerMonitorIndicator();
-    Main.panel.addToStatusArea('acer-monitor-control', indicator);
-}
-
-function disable() {
-    if (indicator) {
-        indicator.destroy();
-        indicator = null;
+    disable() {
+        if (this._indicator) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
     }
 }
