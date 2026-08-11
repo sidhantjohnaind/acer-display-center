@@ -55,7 +55,7 @@ class AcerMonitorIndicator extends PanelMenu.Button {
             return Clutter.EVENT_STOP;
         });
 
-        let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control (amctl)', { reactive: false });
+        let titleItem = new PopupMenu.PopupMenuItem('🖥️ Acer Monitor Control', { reactive: false });
         this.menu.addMenuItem(titleItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -151,19 +151,19 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Hardware Presets (0xE2)
-        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets', { reactive: false });
+        // Presets Header
+        let presetHeader = new PopupMenu.PopupMenuItem('Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
         let modes = [
-            { name: '  User Mode (0xE2: 0)', cmd: 'preset user' },
-            { name: '  Standard Mode (0xE2: 1)', cmd: 'preset standard' },
-            { name: '  ECO Power Saver (0xE2: 2)', cmd: 'preset eco' },
-            { name: '  Graphics Mode (0xE2: 3)', cmd: 'preset graphics' },
-            { name: '  HDR Mode (0xE2: 11)', cmd: 'preset hdr' },
-            { name: '  Action Gaming (0xE2: 5)', cmd: 'preset action' },
-            { name: '  Racing Mode (0xE2: 6)', cmd: 'preset racing' },
-            { name: '  Sports Mode (0xE2: 7)', cmd: 'preset sports' },
+            { name: '  User Mode', cmd: 'preset user' },
+            { name: '  Standard Mode', cmd: 'preset standard' },
+            { name: '  ECO Power Saver', cmd: 'preset eco' },
+            { name: '  Graphics Mode', cmd: 'preset graphics' },
+            { name: '  HDR Mode', cmd: 'preset hdr' },
+            { name: '  Action Gaming', cmd: 'preset action' },
+            { name: '  Racing Mode', cmd: 'preset racing' },
+            { name: '  Sports Mode', cmd: 'preset sports' },
         ];
 
         for (let m of modes) {
