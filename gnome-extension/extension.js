@@ -9,15 +9,7 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 
 function execCli(cmd) {
-    try {
-        GLib.spawn_command_line_async(`/usr/local/bin/acer_monitor_cli send ${cmd}`);
-    } catch (e) {
-        try {
-            GLib.spawn_command_line_async(`/usr/local/bin/acer_monitor_cli ${cmd}`);
-        } catch (err) {
-            console.error(`AcerMonitor error: ${err}`);
-        }
-    }
+    GLib.spawn_command_line_async(`/usr/local/bin/acer_monitor_cli ${cmd}`);
 }
 
 function getInitialState() {
@@ -67,21 +59,28 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(titleItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Brightness Section with 150ms I2C Debounce
+        // Brightness Section
         let brightTimeout = 0;
         let brightLabelItem = new PopupMenu.PopupMenuItem(`Brightness (${state.brightness}%)`, { reactive: false });
         this.menu.addMenuItem(brightLabelItem);
 
         let brightSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let brightSlider = new Slider.Slider(state.brightness / 100.0);
+
+        let applyBrightness = () => {
+            let val = Math.round(brightSlider.value * 100);
+            brightLabelItem.label.set_text(`Brightness (${val}%)`);
+            execCli(`brightness ${val}`);
+        };
+
+        brightSlider.connect('drag-end', applyBrightness);
         brightSlider.connect('notify::value', () => {
             let val = Math.round(brightSlider.value * 100);
             brightLabelItem.label.set_text(`Brightness (${val}%)`);
             if (brightTimeout) {
                 GLib.source_remove(brightTimeout);
-                brightTimeout = 0;
             }
-            brightTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+            brightTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 execCli(`brightness ${val}`);
                 brightTimeout = 0;
                 return GLib.SOURCE_REMOVE;
@@ -90,21 +89,28 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         brightSliderItem.add_child(brightSlider);
         this.menu.addMenuItem(brightSliderItem);
 
-        // Contrast Section with 150ms I2C Debounce
+        // Contrast Section
         let contrastTimeout = 0;
         let contrastLabelItem = new PopupMenu.PopupMenuItem(`Contrast (${state.contrast}%)`, { reactive: false });
         this.menu.addMenuItem(contrastLabelItem);
 
         let contrastSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let contrastSlider = new Slider.Slider(state.contrast / 100.0);
+
+        let applyContrast = () => {
+            let val = Math.round(contrastSlider.value * 100);
+            contrastLabelItem.label.set_text(`Contrast (${val}%)`);
+            execCli(`contrast ${val}`);
+        };
+
+        contrastSlider.connect('drag-end', applyContrast);
         contrastSlider.connect('notify::value', () => {
             let val = Math.round(contrastSlider.value * 100);
             contrastLabelItem.label.set_text(`Contrast (${val}%)`);
             if (contrastTimeout) {
                 GLib.source_remove(contrastTimeout);
-                contrastTimeout = 0;
             }
-            contrastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+            contrastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 execCli(`contrast ${val}`);
                 contrastTimeout = 0;
                 return GLib.SOURCE_REMOVE;
@@ -113,21 +119,28 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         contrastSliderItem.add_child(contrastSlider);
         this.menu.addMenuItem(contrastSliderItem);
 
-        // Volume Section with 150ms I2C Debounce
+        // Volume Section
         let volumeTimeout = 0;
         let volumeLabelItem = new PopupMenu.PopupMenuItem(`Volume (${state.volume}%)`, { reactive: false });
         this.menu.addMenuItem(volumeLabelItem);
 
         let volumeSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let volumeSlider = new Slider.Slider(state.volume / 100.0);
+
+        let applyVolume = () => {
+            let val = Math.round(volumeSlider.value * 100);
+            volumeLabelItem.label.set_text(`Volume (${val}%)`);
+            execCli(`volume ${val}`);
+        };
+
+        volumeSlider.connect('drag-end', applyVolume);
         volumeSlider.connect('notify::value', () => {
             let val = Math.round(volumeSlider.value * 100);
             volumeLabelItem.label.set_text(`Volume (${val}%)`);
             if (volumeTimeout) {
                 GLib.source_remove(volumeTimeout);
-                volumeTimeout = 0;
             }
-            volumeTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+            volumeTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 execCli(`volume ${val}`);
                 volumeTimeout = 0;
                 return GLib.SOURCE_REMOVE;
