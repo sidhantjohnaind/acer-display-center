@@ -119,11 +119,21 @@ class AcerMonitorIndicator extends QuickSettings.SystemIndicator {
 
 export default class AcerMonitorExtension extends Extension {
     enable() {
-        this._indicator = new AcerMonitorIndicator();
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
+        this._idleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            if (Main.panel.statusArea.quickSettings) {
+                this._indicator = new AcerMonitorIndicator();
+                Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
+            }
+            this._idleId = 0;
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     disable() {
+        if (this._idleId) {
+            GLib.source_remove(this._idleId);
+            this._idleId = 0;
+        }
         if (this._indicator) {
             this._indicator.destroy();
             this._indicator = null;
