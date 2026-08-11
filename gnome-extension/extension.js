@@ -114,14 +114,17 @@ export default class AcerMonitorExtension extends Extension {
         this._menuItems.push(presetSubMenu);
 
         let modes = [
-            { label: 'User Mode', shortName: 'User', cmd: 'preset user' },
-            { label: 'Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
-            { label: 'ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
-            { label: 'Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
-            { label: 'HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
-            { label: 'Action Gaming', shortName: 'Action', cmd: 'preset action' },
-            { label: 'Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
-            { label: 'Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
+            { label: '  User Mode', shortName: 'User', cmd: 'preset user' },
+            { label: '  Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
+            { label: '🌱 ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
+            { label: '📖 Reading / BlueLight Mode', shortName: 'Reading', cmd: 'preset reading' },
+            { label: '🌙 Dark Night Mode', shortName: 'Dark', cmd: 'bluelight 4' },
+            { label: '🎨 Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
+            { label: '✨ HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
+            { label: '🎬 Movie / Cinema Mode', shortName: 'Movie', cmd: 'preset movie' },
+            { label: '🎮 Action Gaming', shortName: 'Action', cmd: 'preset action' },
+            { label: '🏎️ Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
+            { label: '⚽ Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
         ];
 
         for (let m of modes) {
