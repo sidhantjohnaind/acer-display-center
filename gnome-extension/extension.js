@@ -1,27 +1,14 @@
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
 import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
 import St from 'gi://St';
 import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
+import Clutter from 'gi://Clutter';
 
 function execCli(cmd) {
     GLib.spawn_command_line_async(`/usr/local/bin/amctl ${cmd}`);
 }
-
-const PRESET_NAMES = {
-    0: 'User',
-    1: 'Standard',
-    2: 'ECO',
-    3: 'Graphics',
-    4: 'HDR',
-    5: 'Action',
-    6: 'Racing',
-    7: 'Sports',
-    11: 'HDR'
-};
 
 function getInitialState() {
     try {
@@ -30,126 +17,133 @@ function getInitialState() {
             let str = new TextDecoder().decode(stdout);
             let parsed = JSON.parse(str);
             if (parsed && parsed.current_values) {
-                let modeVal = parsed.current_values.display_mode ? parsed.current_values.display_mode.current : 1;
+                let modeVal = parsed.current_values.display_mode
+                    ? parsed.current_values.display_mode.current : 1;
+                let modeName = {
+                    0: 'User', 1: 'Standard', 2: 'ECO', 3: 'Graphics',
+                    5: 'Action', 6: 'Racing', 7: 'Sports', 11: 'HDR'
+                }[modeVal] || `Mode ${modeVal}`;
                 return {
-                    brightness: parsed.current_values.brightness ? parsed.current_values.brightness.current : 80,
-                    contrast: parsed.current_values.contrast ? parsed.current_values.contrast.current : 50,
-                    volume: parsed.current_values.volume ? parsed.current_values.volume.current : 100,
-                    display_mode: modeVal,
-                    mode_name: PRESET_NAMES[modeVal] || `Mode ${modeVal}`
+                    brightness: parsed.current_values.brightness
+                        ? parsed.current_values.brightness.current : 80,
+                    contrast: parsed.current_values.contrast
+                        ? parsed.current_values.contrast.current : 50,
+                    mode_name: modeName,
                 };
             }
         }
-    } catch (e) {
-        console.error(`AcerMonitor state error: ${e}`);
-    }
-    return { brightness: 80, contrast: 50, volume: 100, display_mode: 1, mode_name: 'Standard' };
+    } catch (_) { /* ignore */ }
+    return { brightness: 80, contrast: 50, mode_name: 'Standard' };
+}
+
+function makeSliderRow(iconName, value, onChange) {
+    let row = new St.BoxLayout({
+        style_class: 'quick-slider',
+        reactive: true,
+        x_expand: true,
+    });
+
+    let icon = new St.Icon({
+        icon_name: iconName,
+        style_class: 'quick-slider-icon',
+        y_align: Clutter.ActorAlign.CENTER,
+    });
+
+    let slider = new Slider.Slider(value / 100.0);
+    slider.x_expand = true;
+
+    let label = new St.Label({
+        text: `${value}%`,
+        y_align: Clutter.ActorAlign.CENTER,
+        style: 'min-width: 2.8em; text-align: right;',
+    });
+
+    let timeout = 0;
+    slider.connect('notify::value', () => {
+        let val = Math.round(slider.value * 100);
+        label.text = `${val}%`;
+        if (timeout) GLib.source_remove(timeout);
+        timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+            onChange(val);
+            timeout = 0;
+            return GLib.SOURCE_REMOVE;
+        });
+    });
+
+    row.add_child(icon);
+    row.add_child(slider);
+    row.add_child(label);
+    return row;
 }
 
 export default class AcerMonitorExtension extends Extension {
     enable() {
         let state = getInitialState();
-        let sysMenu = Main.panel.statusArea.quickSettings.menu;
+        let qs = Main.panel.statusArea.quickSettings;
+        let menuBox = qs.menu.box;
 
-        this._menuItems = [];
+        this._widgets = [];
 
-        // Presets SubMenu inserted at top (position 0)
-        let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(`Preset: ${state.mode_name}`, true);
-        presetSubMenu.style_class = 'quick-menu-toggle popup-menu-item';
+        // === Container for sliders — inserted BEFORE the grid (index 0 in menuBox) ===
+        let sliderContainer = new St.BoxLayout({
+            vertical: true,
+            x_expand: true,
+            style: 'margin: 0; padding: 0;',
+        });
+
+        // Brightness
+        sliderContainer.add_child(makeSliderRow(
+            'display-brightness-symbolic',
+            state.brightness,
+            (val) => execCli(`brightness ${val}`)
+        ));
+
+        // Contrast
+        sliderContainer.add_child(makeSliderRow(
+            'display-symbolic',
+            state.contrast,
+            (val) => execCli(`contrast ${val}`)
+        ));
+
+        // Insert BEFORE everything else in the menu box (above the grid)
+        menuBox.insert_child_at_index(sliderContainer, 0);
+        this._widgets.push(sliderContainer);
+
+        // === Preset SubMenu — added to sysMenu at position 0 ===
+        // (appears as a pill below the grid, similar to other popup items)
+        let presetSubMenu = new PopupMenu.PopupSubMenuMenuItem(
+            `Preset: ${state.mode_name}`, true
+        );
         presetSubMenu.icon.icon_name = 'video-display-symbolic';
-        sysMenu.addMenuItem(presetSubMenu, 0);
-        this._menuItems.push(presetSubMenu);
 
-        let modes = [
-            { label: 'User Mode', shortName: 'User', cmd: 'preset user' },
-            { label: 'Standard Mode', shortName: 'Standard', cmd: 'preset standard' },
-            { label: 'ECO Power Saver', shortName: 'ECO', cmd: 'preset eco' },
-            { label: 'Graphics Mode', shortName: 'Graphics', cmd: 'preset graphics' },
-            { label: 'HDR Mode', shortName: 'HDR', cmd: 'preset hdr' },
-            { label: 'Action Gaming', shortName: 'Action', cmd: 'preset action' },
-            { label: 'Racing Mode', shortName: 'Racing', cmd: 'preset racing' },
-            { label: 'Sports Mode', shortName: 'Sports', cmd: 'preset sports' },
+        const MODES = [
+            { label: 'User Mode',       short: 'User',     cmd: 'preset user' },
+            { label: 'Standard Mode',   short: 'Standard', cmd: 'preset standard' },
+            { label: 'ECO Power Saver', short: 'ECO',      cmd: 'preset eco' },
+            { label: 'Graphics Mode',   short: 'Graphics', cmd: 'preset graphics' },
+            { label: 'HDR Mode',        short: 'HDR',      cmd: 'preset hdr' },
+            { label: 'Action Gaming',   short: 'Action',   cmd: 'preset action' },
+            { label: 'Racing Mode',     short: 'Racing',   cmd: 'preset racing' },
+            { label: 'Sports Mode',     short: 'Sports',   cmd: 'preset sports' },
         ];
 
-        for (let m of modes) {
+        for (let m of MODES) {
             let item = new PopupMenu.PopupMenuItem(m.label);
             item.connect('activate', () => {
                 execCli(m.cmd);
-                presetSubMenu.label.set_text(`Preset: ${m.shortName}`);
+                presetSubMenu.label.text = `Preset: ${m.short}`;
             });
             presetSubMenu.menu.addMenuItem(item);
         }
 
-        // === Contrast Slider at position 0 ===
-        let contrastItem = new PopupMenu.PopupBaseMenuItem({ style_class: 'quick-slider', reactive: true, activate: false });
-        let contrastIcon = new St.Icon({
-            icon_name: 'display-symbolic',
-            style_class: 'quick-slider-icon',
-        });
-        let contrastSlider = new Slider.Slider(state.contrast / 100.0);
-        let contrastLabel = new St.Label({
-            text: `${state.contrast}%`,
-            y_align: 1,
-            style: 'min-width: 2.5em; text-align: right;'
-        });
-
-        let contrastTimeout = 0;
-        contrastSlider.connect('notify::value', () => {
-            let val = Math.round(contrastSlider.value * 100);
-            contrastLabel.text = `${val}%`;
-            if (contrastTimeout) GLib.source_remove(contrastTimeout);
-            contrastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                execCli(`contrast ${val}`);
-                contrastTimeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-
-        contrastItem.add_child(contrastIcon);
-        contrastItem.add_child(contrastSlider);
-        contrastItem.add_child(contrastLabel);
-        sysMenu.addMenuItem(contrastItem, 0);
-        this._menuItems.push(contrastItem);
-
-        // === Brightness Slider at position 0 (ends up first) ===
-        let brightItem = new PopupMenu.PopupBaseMenuItem({ style_class: 'quick-slider', reactive: true, activate: false });
-        let brightIcon = new St.Icon({
-            icon_name: 'display-brightness-symbolic',
-            style_class: 'quick-slider-icon',
-        });
-        let brightSlider = new Slider.Slider(state.brightness / 100.0);
-        let brightLabel = new St.Label({
-            text: `${state.brightness}%`,
-            y_align: 1,
-            style: 'min-width: 2.5em; text-align: right;'
-        });
-
-        let brightTimeout = 0;
-        brightSlider.connect('notify::value', () => {
-            let val = Math.round(brightSlider.value * 100);
-            brightLabel.text = `${val}%`;
-            if (brightTimeout) GLib.source_remove(brightTimeout);
-            brightTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
-                execCli(`brightness ${val}`);
-                brightTimeout = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        });
-
-        brightItem.add_child(brightIcon);
-        brightItem.add_child(brightSlider);
-        brightItem.add_child(brightLabel);
-        sysMenu.addMenuItem(brightItem, 0);
-        this._menuItems.push(brightItem);
-
+        qs.menu.addMenuItem(presetSubMenu, 0);
+        this._widgets.push(presetSubMenu);
     }
 
     disable() {
-        if (this._menuItems) {
-            for (let item of this._menuItems) {
-                item.destroy();
-            }
-            this._menuItems = [];
+        for (let w of this._widgets ?? []) {
+            w.destroy();
         }
+        this._widgets = [];
     }
 }
