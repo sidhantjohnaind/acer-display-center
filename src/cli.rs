@@ -28,7 +28,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "preset" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli preset <user|standard|eco|graphics|hdr|action|racing|sports|reading|movie|0-7> [specifier]".to_string());
+                return Err("Usage: acer_monitor_cli preset <user|standard|eco|graphics|hdr|action|racing|sports|reading|movie|0-11> [specifier]".to_string());
             }
             let preset_name = args[0].to_ascii_lowercase();
             let spec = parse_optional_specifier(&args[1..]);
@@ -39,10 +39,10 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                     "standard" | "normal" => acer::display_mode(mon, 1),
                     "eco" => acer::display_mode(mon, 2),
                     "graphics" => acer::display_mode(mon, 3),
-                    "hdr" => acer::raw_bank(mon, 0xE7, 8, 1),
                     "action" | "gaming" => acer::display_mode(mon, 5),
                     "racing" => acer::display_mode(mon, 6),
                     "sports" => acer::display_mode(mon, 7),
+                    "hdr" | "hdr400" => acer::display_mode(mon, 11),
                     "reading" | "text" => mon.set_vcp(0xDC, 0x02),
                     "movie" | "cinema" => mon.set_vcp(0xDC, 0x03),
                     other => {

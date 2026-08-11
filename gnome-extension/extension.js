@@ -151,8 +151,8 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Exact User VCP 0xE2 Presets
-        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets (0xE2)', { reactive: false });
+        // Hardware Presets (Verified VCP 0xE2)
+        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
         let modes = [
@@ -160,7 +160,7 @@ class AcerMonitorIndicator extends PanelMenu.Button {
             { name: '  Standard Mode (0xE2: 1)', cmd: 'preset standard' },
             { name: '  ECO Power Saver (0xE2: 2)', cmd: 'preset eco' },
             { name: '  Graphics Mode (0xE2: 3)', cmd: 'preset graphics' },
-            { name: '  HDR Mode (0xE2: 4)', cmd: 'preset hdr' },
+            { name: '  HDR Mode (0xE2: 11)', cmd: 'preset hdr' },
             { name: '  Action Gaming (0xE2: 5)', cmd: 'preset action' },
             { name: '  Racing Mode (0xE2: 6)', cmd: 'preset racing' },
             { name: '  Sports Mode (0xE2: 7)', cmd: 'preset sports' },
