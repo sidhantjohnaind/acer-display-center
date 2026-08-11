@@ -28,7 +28,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "preset" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli preset <standard|eco|graphics|hdr|racing|sports> [specifier]".to_string());
+                return Err("Usage: acer_monitor_cli preset <standard|eco|graphics|hdr|racing|sports|action|movie|0-7> [specifier]".to_string());
             }
             let preset_name = args[0].to_ascii_lowercase();
             let spec = parse_optional_specifier(&args[1..]);
@@ -36,11 +36,13 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             let mode_val = match preset_name.as_str() {
                 "standard" | "normal" => 0,
                 "eco" => 1,
-                "graphics" | "action" => 2,
-                "hdr" | "user" | "gaming" => 3,
+                "graphics" => 2,
+                "hdr" | "user" => 3,
                 "racing" => 4,
                 "sports" => 5,
-                other => return Err(format!("Unknown preset '{other}'. Use standard, eco, graphics, hdr, racing, or sports.")),
+                "action" | "gaming" => 6,
+                "movie" => 7,
+                other => parse_u32(other).unwrap_or_else(|_| 0),
             };
 
             with_monitor(spec, |mon| acer::display_mode(mon, mode_val))?;

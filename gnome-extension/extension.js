@@ -151,25 +151,26 @@ class AcerMonitorIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Presets Header
-        let presetHeader = new PopupMenu.PopupMenuItem('Mode Presets', { reactive: false });
+        // All 8 Hardware Mode Presets
+        let presetHeader = new PopupMenu.PopupMenuItem('Hardware Presets (8 Modes)', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
-        let itemStandard = new PopupMenu.PopupMenuItem('  Standard Mode');
-        itemStandard.connect('activate', () => execCli('preset standard'));
-        this.menu.addMenuItem(itemStandard);
+        let modes = [
+            { name: '  Mode 0: Standard Mode', cmd: 'preset standard' },
+            { name: '  Mode 1: ECO Power Saver', cmd: 'preset eco' },
+            { name: '  Mode 2: Graphics Mode', cmd: 'preset graphics' },
+            { name: '  Mode 3: HDR / User Mode', cmd: 'preset hdr' },
+            { name: '  Mode 4: Racing Mode', cmd: 'preset racing' },
+            { name: '  Mode 5: Sports Mode', cmd: 'preset sports' },
+            { name: '  Mode 6: Action Gaming Mode', cmd: 'preset action' },
+            { name: '  Mode 7: Movie Mode', cmd: 'preset movie' },
+        ];
 
-        let itemEco = new PopupMenu.PopupMenuItem('  ECO Power Saver');
-        itemEco.connect('activate', () => execCli('preset eco'));
-        this.menu.addMenuItem(itemEco);
-
-        let itemHdr = new PopupMenu.PopupMenuItem('  HDR Gaming Mode');
-        itemHdr.connect('activate', () => execCli('preset hdr'));
-        this.menu.addMenuItem(itemHdr);
-
-        let itemReading = new PopupMenu.PopupMenuItem('  Reading Mode (Warm)');
-        itemReading.connect('activate', () => execCli('colortemp warm'));
-        this.menu.addMenuItem(itemReading);
+        for (let m of modes) {
+            let item = new PopupMenu.PopupMenuItem(m.name);
+            item.connect('activate', () => execCli(m.cmd));
+            this.menu.addMenuItem(item);
+        }
     }
 });
 
