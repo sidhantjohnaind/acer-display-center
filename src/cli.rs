@@ -28,21 +28,23 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "preset" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli preset <action|racing|sports|user|eco|reading|movie|graphics> [specifier]".to_string());
+                return Err("Usage: acer_monitor_cli preset <user|standard|eco|graphics|hdr|action|racing|sports|reading|movie|0-7> [specifier]".to_string());
             }
             let preset_name = args[0].to_ascii_lowercase();
             let spec = parse_optional_specifier(&args[1..]);
 
             with_monitor(spec, |mon| {
                 match preset_name.as_str() {
-                    "action" | "gaming" => acer::display_mode(mon, 0),
-                    "racing" => acer::display_mode(mon, 1),
-                    "sports" => acer::display_mode(mon, 2),
-                    "user" | "standard" | "hdr" => acer::display_mode(mon, 3),
-                    "eco" => acer::display_mode(mon, 4),
+                    "user" => acer::display_mode(mon, 0),
+                    "standard" | "normal" => acer::display_mode(mon, 1),
+                    "eco" => acer::display_mode(mon, 2),
+                    "graphics" => acer::display_mode(mon, 3),
+                    "hdr" => acer::display_mode(mon, 4),
+                    "action" | "gaming" => acer::display_mode(mon, 5),
+                    "racing" => acer::display_mode(mon, 6),
+                    "sports" => acer::display_mode(mon, 7),
                     "reading" | "text" => mon.set_vcp(0xDC, 0x02),
                     "movie" | "cinema" => mon.set_vcp(0xDC, 0x03),
-                    "graphics" => mon.set_vcp(0xDC, 0x06),
                     other => {
                         let val = parse_u32(other)?;
                         acer::display_mode(mon, val)
