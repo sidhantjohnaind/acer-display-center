@@ -1,0 +1,7 @@
+{
+  "uuid": "acer-monitor@sidhant",
+  "name": "Acer Monitor Control",
+  "description": "Control Brightness, Contrast, Volume, and Hardware Presets for Acer DDC/CI Monitors",
+  "shell-version": [ "40", "41", "42", "43", "44", "45", "46" ],
+  "url": "https://github.com/sidhantjohnaind/acer_monitor_cli"
+}
