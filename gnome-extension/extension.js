@@ -12,13 +12,13 @@ function execCli(cmd) {
     try {
         GLib.spawn_command_line_async(`/usr/local/bin/acer_monitor_cli ${cmd}`);
     } catch (e) {
-        console.error(`AcerMonitor: Failed to run cmd ${cmd}: ${e}`);
+        console.error(`AcerMonitor: Error running cmd ${cmd}: ${e}`);
     }
 }
 
 function getInitialState() {
     try {
-        let [res, stdout, stderr, status] = GLib.spawn_command_line_sync('/usr/local/bin/acer_monitor_cli info --json');
+        let [res, stdout] = GLib.spawn_command_line_sync('/usr/local/bin/acer_monitor_cli info --json');
         if (res && stdout) {
             let str = new TextDecoder().decode(stdout);
             let parsed = JSON.parse(str);
@@ -31,7 +31,7 @@ function getInitialState() {
             }
         }
     } catch (e) {
-        console.error(`AcerMonitor: Error reading initial info: ${e}`);
+        console.error(`AcerMonitor: Error reading info: ${e}`);
     }
     return { brightness: 80, contrast: 50, volume: 100 };
 }
@@ -63,51 +63,57 @@ class AcerMonitorIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(titleItem);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Brightness Slider
-        let brightBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
-        let brightLabel = new St.Label({ text: 'Brightness  ', y_align: Clutter.ActorAlign.CENTER });
+        // Brightness Section
+        let brightLabel = new St.Label({ text: `Brightness (${state.brightness}%)`, style: 'font-weight: bold;' });
+        let brightLabelItem = new PopupMenu.PopupMenuItem(brightLabel.text, { reactive: false });
+        this.menu.addMenuItem(brightLabelItem);
+
+        let brightSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let brightSlider = new Slider.Slider(state.brightness / 100.0);
-        brightSlider.connect('notify::value', () => {
+        brightSlider.connect('drag-end', () => {
             let val = Math.round(brightSlider.value * 100);
+            brightLabelItem.label.set_text(`Brightness (${val}%)`);
             execCli(`brightness ${val}`);
         });
-        brightBox.add_child(brightLabel);
-        brightBox.add_child(brightSlider);
-        let brightItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        brightItem.add_child(brightBox);
-        this.menu.addMenuItem(brightItem);
+        brightSlider.connect('notify::value', () => {
+            let val = Math.round(brightSlider.value * 100);
+            brightLabelItem.label.set_text(`Brightness (${val}%)`);
+            execCli(`brightness ${val}`);
+        });
+        brightSliderItem.add_child(brightSlider);
+        this.menu.addMenuItem(brightSliderItem);
 
-        // Contrast Slider
-        let contrastBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
-        let contrastLabel = new St.Label({ text: 'Contrast    ', y_align: Clutter.ActorAlign.CENTER });
+        // Contrast Section
+        let contrastLabelItem = new PopupMenu.PopupMenuItem(`Contrast (${state.contrast}%)`, { reactive: false });
+        this.menu.addMenuItem(contrastLabelItem);
+
+        let contrastSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let contrastSlider = new Slider.Slider(state.contrast / 100.0);
         contrastSlider.connect('notify::value', () => {
             let val = Math.round(contrastSlider.value * 100);
+            contrastLabelItem.label.set_text(`Contrast (${val}%)`);
             execCli(`contrast ${val}`);
         });
-        contrastBox.add_child(contrastLabel);
-        contrastBox.add_child(contrastSlider);
-        let contrastItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        contrastItem.add_child(contrastBox);
-        this.menu.addMenuItem(contrastItem);
+        contrastSliderItem.add_child(contrastSlider);
+        this.menu.addMenuItem(contrastSliderItem);
 
-        // Volume Slider
-        let volumeBox = new St.BoxLayout({ vertical: false, style_class: 'slider-box' });
-        let volumeLabel = new St.Label({ text: 'Volume      ', y_align: Clutter.ActorAlign.CENTER });
+        // Volume Section
+        let volumeLabelItem = new PopupMenu.PopupMenuItem(`Volume (${state.volume}%)`, { reactive: false });
+        this.menu.addMenuItem(volumeLabelItem);
+
+        let volumeSliderItem = new PopupMenu.PopupBaseMenuItem({ reactive: true, activate: false });
         let volumeSlider = new Slider.Slider(state.volume / 100.0);
         volumeSlider.connect('notify::value', () => {
             let val = Math.round(volumeSlider.value * 100);
+            volumeLabelItem.label.set_text(`Volume (${val}%)`);
             execCli(`volume ${val}`);
         });
-        volumeBox.add_child(volumeLabel);
-        volumeBox.add_child(volumeSlider);
-        let volumeItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        volumeItem.add_child(volumeBox);
-        this.menu.addMenuItem(volumeItem);
+        volumeSliderItem.add_child(volumeSlider);
+        this.menu.addMenuItem(volumeSliderItem);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Hardware Preset Buttons
+        // Presets Header
         let presetHeader = new PopupMenu.PopupMenuItem('Mode Presets', { reactive: false });
         this.menu.addMenuItem(presetHeader);
 
