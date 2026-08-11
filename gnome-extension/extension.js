@@ -43,56 +43,59 @@ function getInitialState() {
     return { brightness: 80, contrast: 50, volume: 100, display_mode: 1, mode_name: 'Standard' };
 }
 
-const AcerMonitorIndicator = GObject.registerClass(
-class AcerMonitorIndicator extends QuickSettings.SystemIndicator {
-    _init() {
+// Full-width Brightness Slider
+const AcerBrightnessSlider = GObject.registerClass(
+class AcerBrightnessSlider extends QuickSettings.QuickSlider {
+    _init(initialVal) {
         super._init();
+        this.iconName = 'display-brightness-symbolic';
+        this.slider.value = initialVal / 100.0;
 
-        let state = getInitialState();
-
-        // Top right system indicator icon
-        this._icon = this._addIndicator();
-        this._icon.icon_name = 'display-brightness-symbolic';
-
-        // Brightness Slider in System Nav
-        this._brightSlider = new QuickSettings.QuickSlider();
-        this._brightSlider.iconName = 'display-brightness-symbolic';
-        this._brightSlider.slider.value = state.brightness / 100.0;
-
-        let brightTimeout = 0;
-        this._brightSlider.slider.connect('notify::value', () => {
-            let val = Math.round(this._brightSlider.slider.value * 100);
-            if (brightTimeout) GLib.source_remove(brightTimeout);
-            brightTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+        let timeout = 0;
+        this.slider.connect('notify::value', () => {
+            let val = Math.round(this.slider.value * 100);
+            if (timeout) GLib.source_remove(timeout);
+            timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 execCli(`brightness ${val}`);
-                brightTimeout = 0;
+                timeout = 0;
                 return GLib.SOURCE_REMOVE;
             });
         });
+    }
+});
 
-        // Contrast Slider in System Nav
-        this._contrastSlider = new QuickSettings.QuickSlider();
-        this._contrastSlider.iconName = 'display-symbolic';
-        this._contrastSlider.slider.value = state.contrast / 100.0;
+// Full-width Contrast Slider
+const AcerContrastSlider = GObject.registerClass(
+class AcerContrastSlider extends QuickSettings.QuickSlider {
+    _init(initialVal) {
+        super._init();
+        this.iconName = 'display-symbolic';
+        this.slider.value = initialVal / 100.0;
 
-        let contrastTimeout = 0;
-        this._contrastSlider.slider.connect('notify::value', () => {
-            let val = Math.round(this._contrastSlider.slider.value * 100);
-            if (contrastTimeout) GLib.source_remove(contrastTimeout);
-            contrastTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+        let timeout = 0;
+        this.slider.connect('notify::value', () => {
+            let val = Math.round(this.slider.value * 100);
+            if (timeout) GLib.source_remove(timeout);
+            timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 execCli(`contrast ${val}`);
-                contrastTimeout = 0;
+                timeout = 0;
                 return GLib.SOURCE_REMOVE;
             });
         });
+    }
+});
 
-        // Presets Toggle Pill displaying active preset name
-        this._presetsToggle = new QuickSettings.QuickMenuToggle({
-            title: `Preset: ${state.mode_name}`,
+// Presets Menu Toggle Pill
+const AcerPresetsToggle = GObject.registerClass(
+class AcerPresetsToggle extends QuickSettings.QuickMenuToggle {
+    _init(initialModeName) {
+        super._init({
+            title: `Preset: ${initialModeName}`,
             iconName: 'video-display-symbolic',
             toggleMode: false,
         });
-        this._presetsToggle.menu.setHeader('video-display-symbolic', 'Presets');
+
+        this.menu.setHeader('video-display-symbolic', 'Presets');
 
         let modes = [
             { label: 'User Mode', shortName: 'User', cmd: 'preset user' },
@@ -106,27 +109,42 @@ class AcerMonitorIndicator extends QuickSettings.SystemIndicator {
         ];
 
         for (let m of modes) {
-            this._presetsToggle.menu.addAction(m.label, () => {
+            this.menu.addAction(m.label, () => {
                 execCli(m.cmd);
-                this._presetsToggle.title = `Preset: ${m.shortName}`;
+                this.title = `Preset: ${m.shortName}`;
             });
         }
-
-        // Attach controls into System QuickSettings Nav
-        this.quickSettingsItems = [this._brightSlider, this._contrastSlider, this._presetsToggle];
     }
 });
 
 export default class AcerMonitorExtension extends Extension {
     enable() {
-        this._indicator = new AcerMonitorIndicator();
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
+        let state = getInitialState();
+
+        this._brightSlider = new AcerBrightnessSlider(state.brightness);
+        this._contrastSlider = new AcerContrastSlider(state.contrast);
+        this._presetsToggle = new AcerPresetsToggle(state.mode_name);
+
+        let grid = Main.panel.statusArea.quickSettings._grid;
+
+        // Insert sliders at the very top (indices 0 & 1) spanning 2 columns (full width)!
+        grid.insert_child_at_index(this._brightSlider, 0);
+        grid.insert_child_at_index(this._contrastSlider, 1);
+
+        try {
+            grid.set_child_packing(this._brightSlider, true, true, 2, 0);
+            grid.set_child_packing(this._contrastSlider, true, true, 2, 0);
+        } catch (e) {
+            // Fallback for GNOME layout packing
+        }
+
+        // Add Presets pill button to the grid
+        Main.panel.statusArea.quickSettings.addItem(this._presetsToggle);
     }
 
     disable() {
-        if (this._indicator) {
-            this._indicator.destroy();
-            this._indicator = null;
-        }
+        if (this._brightSlider) { this._brightSlider.destroy(); this._brightSlider = null; }
+        if (this._contrastSlider) { this._contrastSlider.destroy(); this._contrastSlider = null; }
+        if (this._presetsToggle) { this._presetsToggle.destroy(); this._presetsToggle = null; }
     }
 }
