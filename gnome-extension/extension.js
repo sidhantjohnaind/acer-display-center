@@ -8,8 +8,6 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 
 /* ------------------------------------------------------------------ */
-/*  CLI helper                                                          */
-/* ------------------------------------------------------------------ */
 function execCli(cmd) {
     GLib.spawn_command_line_async(`/usr/local/bin/amctl ${cmd}`);
 }
@@ -39,36 +37,51 @@ function getInitialState() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Native-looking slider widget                                        */
-/*  Mirrors how GNOME 46's QuickSlider is built internally             */
+/*  Slider row — styled to match native GNOME quick-settings look      */
+/*  (cannot use qs._grid due to Ubuntu-patched QuickSettingsLayout)    */
 /* ------------------------------------------------------------------ */
 const AcerSlider = GObject.registerClass(
-class AcerSlider extends St.Widget {
+class AcerSlider extends St.BoxLayout {
     _init(iconName, initialValue, onChange) {
         super._init({
-            style_class: 'quick-slider',
-            layout_manager: new Clutter.BinLayout(),
+            // Match the panel's horizontal padding (18px each side)
+            // and a bottom gap equal to the grid row spacing (12px)
+            style: `
+                padding: 0 18px 12px 18px;
+                spacing: 6px;
+            `,
             x_expand: true,
         });
 
-        // Inner box — same structure as native QuickSlider
-        this._box = new St.BoxLayout({ x_expand: true });
-        this.add_child(this._box);
-
         this._icon = new St.Icon({
             icon_name: iconName,
+            icon_size: 16,
             style_class: 'quick-slider-icon',
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._box.add_child(this._icon);
+        this.add_child(this._icon);
 
+        // slider-bin wrapper (matches .quick-slider .slider-bin CSS)
+        let bin = new St.Bin({
+            style: 'padding: 6px; border-radius: 999px;',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         this._slider = new Slider.Slider(initialValue / 100.0);
-        this._slider.x_expand = true;
-        this._box.add_child(this._slider);
+        bin.set_child(this._slider);
+        this.add_child(bin);
+
+        this._label = new St.Label({
+            text: `${initialValue}%`,
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'min-width: 2.8em; text-align: right; font-size: 0.9em;',
+        });
+        this.add_child(this._label);
 
         this._timeout = 0;
         this._slider.connect('notify::value', () => {
             let val = Math.round(this._slider.value * 100);
+            this._label.text = `${val}%`;
             if (this._timeout) GLib.source_remove(this._timeout);
             this._timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 120, () => {
                 onChange(val);
@@ -88,43 +101,37 @@ class AcerSlider extends St.Widget {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Extension                                                           */
-/* ------------------------------------------------------------------ */
 export default class AcerMonitorExtension extends Extension {
     enable() {
         let state = getInitialState();
         let qs    = Main.panel.statusArea.quickSettings;
-        let grid  = qs._grid;          // The actual St.Widget grid
-        let lm    = grid.layout_manager;
+        let box   = qs.menu.box;   // Safe: St.BoxLayout, no broken layout manager
 
-        this._inGrid = [];
-        this._inMenu = [];
+        this._items = [];
 
-        // --- Brightness slider (inserted at grid position 0) ---
-        this._bright = new AcerSlider(
+        // === Brightness slider ===
+        let bright = new AcerSlider(
             'display-brightness-symbolic',
             state.brightness,
             val => execCli(`brightness ${val}`)
         );
-        grid.insert_child_at_index(this._bright, 0);
-        try { lm.set_column_span(this._bright, 2); } catch (_) {}
-        this._inGrid.push(this._bright);
+        box.insert_child_at_index(bright, 0);
+        this._items.push(bright);
 
-        // --- Contrast slider (inserted at grid position 1) ---
-        this._contrast = new AcerSlider(
+        // === Contrast slider ===
+        let contrast = new AcerSlider(
             'display-symbolic',
             state.contrast,
             val => execCli(`contrast ${val}`)
         );
-        grid.insert_child_at_index(this._contrast, 1);
-        try { lm.set_column_span(this._contrast, 2); } catch (_) {}
-        this._inGrid.push(this._contrast);
+        box.insert_child_at_index(contrast, 1);
+        this._items.push(contrast);
 
-        // --- Preset toggle (native PopupSubMenuMenuItem pill) ---
-        this._preset = new PopupMenu.PopupSubMenuMenuItem(
+        // === Preset submenu (native pill via PopupMenu) ===
+        let preset = new PopupMenu.PopupSubMenuMenuItem(
             `Preset: ${state.mode_name}`, true
         );
-        this._preset.icon.icon_name = 'video-display-symbolic';
+        preset.icon.icon_name = 'video-display-symbolic';
 
         const MODES = [
             { label: 'User Mode',       short: 'User',     cmd: 'preset user'     },
@@ -141,27 +148,19 @@ export default class AcerMonitorExtension extends Extension {
             let item = new PopupMenu.PopupMenuItem(m.label);
             item.connect('activate', () => {
                 execCli(m.cmd);
-                this._preset.label.text = `Preset: ${m.short}`;
+                preset.label.text = `Preset: ${m.short}`;
             });
-            this._preset.menu.addMenuItem(item);
+            preset.menu.addMenuItem(item);
         }
 
-        // Add preset to the QuickSettings popup menu (shows below grid, native behaviour)
-        qs.menu.addMenuItem(this._preset, 0);
-        this._inMenu.push(this._preset);
+        qs.menu.addMenuItem(preset, 0);
+        this._items.push(preset);
     }
 
     disable() {
-        // Remove grid items (St.Widget — remove from parent)
-        for (let w of this._inGrid ?? []) {
+        for (let w of this._items ?? []) {
             w.destroy();
         }
-        this._inGrid = [];
-
-        // Remove menu items
-        for (let w of this._inMenu ?? []) {
-            w.destroy();
-        }
-        this._inMenu = [];
+        this._items = [];
     }
 }
