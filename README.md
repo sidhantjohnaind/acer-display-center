@@ -72,10 +72,16 @@
 ---
 
 
-## 📦 Installation
+## 📦 Installation & Standalone Packages
 
-### Linux Quick Install
+### 🐧 Linux AppImage (Portable)
+Download and run the standalone **AppImage** on any Linux distribution without compiling:
+```bash
+chmod +x amctl-x86_64.AppImage
+./amctl-x86_64.AppImage info
+```
 
+### 🐧 Linux Source Install
 Make sure your user is in the `i2c` group and `i2c-dev` kernel module is enabled (`sudo modprobe i2c-dev`).
 
 Run the automated installation script:
@@ -84,10 +90,15 @@ chmod +x install.sh
 ./install.sh
 ```
 
-The script builds the release binary and installs `acer_monitor_cli` along with convenience symlinks `amctl` and `amc` into `/usr/local/bin/`. It also registers the desktop entry and systemd user service.
+### 🪟 Windows Standalone (`.exe` Binary)
+Download and run `acer_monitor_cli.exe` directly from the `dist/` directory, or build via PowerShell:
+```powershell
+cargo build --release --target x86_64-pc-windows-gnu
+```
 
-To enable the systemd background service:
+To enable the systemd background service (Linux):
 ```bash
+
 systemctl --user enable --now acer-monitor
 ```
 
