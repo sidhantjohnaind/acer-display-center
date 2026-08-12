@@ -27,7 +27,9 @@
   - [Profile Management](#profile-management)
   - [Shell & Status Bar Integration](#shell--status-bar-integration)
 - [⚡ Advanced: Raw Banked VCP Control](#-advanced-raw-banked-vcp-control)
+- [⌨️ Keyboard Shortcuts & Global Hotkey Binding](#️-keyboard-shortcuts--global-hotkey-binding)
 - [📄 License](#-license)
+
 
 ---
 
@@ -323,7 +325,58 @@ amctl getbank e7 0x00          # Read Blue Light selector (0x00)
 
 ---
 
+## ⌨️ Keyboard Shortcuts & Global Hotkey Binding
+
+You can bind `amctl` commands to global hotkeys on Linux and Windows for instant display control:
+
+### ⚡ Ultra-Fast Sub-Millisecond Hotkeys (via IPC Daemon)
+
+Run the background IPC server (`amctl server` or `systemctl --user enable --now acer-monitor`) and bind hotkeys to `amctl send`:
+- `amctl send brightness +10` (Bypasses DDC query overhead for sub-millisecond execution)
+- `amctl send brightness -10`
+
+### 🐧 Linux (Hyprland / Sway / i3 / WM)
+
+Add to `hyprland.conf`:
+```ini
+# Brightness Hotkeys
+bind = Super+Alt, Up, exec, amctl brightness +10 --osd
+bind = Super+Alt, Down, exec, amctl brightness -10 --osd
+
+# Preset & Rofi Quick Menu
+bind = Super+Alt, H, exec, amctl preset hdr
+bind = Super+Alt, E, exec, amctl preset eco
+bind = Super+Alt, Space, exec, ./rofi-acer.sh
+```
+
+Add to `sway/config` or `i3/config`:
+```ini
+bindsym Mod4+Mod1+Up exec amctl brightness +10 --osd
+bindsym Mod4+Mod1+Down exec amctl brightness -10 --osd
+bindsym Mod4+Mod1+space exec ./rofi-acer.sh
+```
+
+### 🐧 Linux (GNOME / Ubuntu / KDE Plasma)
+
+Open **Settings -> Keyboard -> Keyboard Shortcuts -> Custom Shortcuts**:
+- **Name**: `Acer Brightness Up` | **Command**: `amctl brightness +10 --osd` | **Shortcut**: `Super+Alt+Up`
+- **Name**: `Acer Brightness Down` | **Command**: `amctl brightness -10 --osd` | **Shortcut**: `Super+Alt+Down`
+- **Name**: `Acer HDR Mode` | **Command**: `amctl preset hdr` | **Shortcut**: `Super+Alt+H`
+
+### 🪟 Windows (AutoHotkey Script)
+
+Use the included [`amctl.ahk`](file:///home/sidhant-aind/Projects/acer_monitor_cli_impl/amctl.ahk) AutoHotkey script:
+```autohotkey
+#!Up::Run, acer_monitor_cli.exe brightness +10 --osd, , Hide
+#!Down::Run, acer_monitor_cli.exe brightness -10 --osd, , Hide
+#!h::Run, acer_monitor_cli.exe preset hdr, , Hide
+#!e::Run, acer_monitor_cli.exe preset eco, , Hide
+```
+
+---
+
 ## 📄 License
 
 Licensed under the [MIT License](LICENSE).
+
 
