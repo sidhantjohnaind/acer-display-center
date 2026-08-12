@@ -155,19 +155,45 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                 return Err("Usage: acer_monitor_cli auto-profile --rule \"process_name:profile.json\"".to_string());
             }
             println!("Auto-Profile Switcher running... Press Ctrl+C to stop.");
+
+            let mut rules = Vec::new();
+            let mut i = 0;
+            while i < args.len() {
+                if let Some(rule) = args[i].strip_prefix("--rule=") {
+                    rules.push(rule.to_string());
+                } else if args[i] == "--rule" && i + 1 < args.len() {
+                    rules.push(args[i + 1].clone());
+                    i += 1;
+                }
+                i += 1;
+            }
+
+            if rules.is_empty() {
+                return Err("No valid rules specified. Usage: acer_monitor_cli auto-profile --rule \"process_name:profile.json\"".to_string());
+            }
+
             loop {
-                for arg in &args {
-                    if let Some(rule) = arg.strip_prefix("--rule=") {
-                        let parts: Vec<&str> = rule.split(':').collect();
-                        if parts.len() == 2 {
-                            let proc_name = parts[0];
-                            let profile_path = parts[1];
-                            #[cfg(unix)]
-                            {
-                                if let Ok(out) = std::process::Command::new("pgrep").arg(proc_name).output() {
-                                    if !out.stdout.is_empty() {
-                                        let _ = with_monitor(None, |mon| profile_load(mon, profile_path));
-                                    }
+                for rule in &rules {
+                    let parts: Vec<&str> = rule.split(':').collect();
+                    if parts.len() == 2 {
+                        let proc_name = parts[0];
+                        let profile_path = parts[1];
+
+                        #[cfg(unix)]
+                        {
+                            if let Ok(out) = std::process::Command::new("pgrep").arg(proc_name).output() {
+                                if !out.stdout.is_empty() {
+                                    let _ = with_monitor(None, |mon| profile_load(mon, profile_path));
+                                }
+                            }
+                        }
+
+                        #[cfg(windows)]
+                        {
+                            if let Ok(out) = std::process::Command::new("tasklist").args(&["/FI", &format!("IMAGENAME eq {proc_name}")]).output() {
+                                let text = String::from_utf8_lossy(&out.stdout);
+                                if text.contains(proc_name) {
+                                    let _ = with_monitor(None, |mon| profile_load(mon, profile_path));
                                 }
                             }
                         }
@@ -176,6 +202,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                 std::thread::sleep(std::time::Duration::from_secs(5));
             }
         }
+
 
         "server" => {
             server::run_server()?;

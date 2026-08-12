@@ -1,4 +1,6 @@
+#[cfg(unix)]
 use std::process::Command;
+
 
 pub fn show_osd_banner(label: &str, current: u32, max: u32) {
     let max = max.max(1);

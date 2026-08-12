@@ -1,8 +1,10 @@
+#[cfg(unix)]
+use std::process::Command;
 use std::{
-    process::Command,
     thread::sleep,
     time::Duration,
 };
+
 use crate::acer;
 
 pub fn is_video_playing() -> bool {
