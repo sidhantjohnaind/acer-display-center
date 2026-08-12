@@ -120,15 +120,19 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
         }
 
         "energy" => {
-            let spec = parse_optional_specifier(&args);
+            let is_hdr_flag = args.iter().any(|a| a == "--hdr");
+            let filtered: Vec<String> = args.iter().filter(|a| *a != "--hdr").cloned().collect();
+            let spec = parse_optional_specifier(&filtered);
             let mut out = String::new();
             with_monitor(spec, |mon| {
                 let (b, _) = mon.get_vcp(0x10).unwrap_or((80, 100));
-                out = energy::report_energy(b, &mon.description);
+                let is_hdr = is_hdr_flag || mon.get_vcp(0xE2).map(|(v, _)| v == 11).unwrap_or(false);
+                out = energy::report_energy(b, &mon.description, is_hdr);
                 Ok(())
             })?;
             Ok(out)
         }
+
 
         "test-pattern" => {
             let name = args.first().map(|s| s.as_str()).unwrap_or("grid");
@@ -204,10 +208,44 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
         }
 
 
+        "hdr" => {
+            let action = args.first().map(|s| s.as_str()).unwrap_or("on");
+            let filtered: Vec<String> = args.iter().filter(|a| *a != "on" && *a != "off" && *a != "enable" && *a != "disable" && *a != "toggle" && *a != "1" && *a != "0").cloned().collect();
+            let spec = parse_optional_specifier(&filtered);
+            let mut out = String::new();
+
+            with_monitor(spec, |mon| {
+                let enable = match action {
+                    "on" | "enable" | "1" => true,
+                    "off" | "disable" | "0" => false,
+                    "toggle" => {
+                        let is_hdr = mon.get_vcp(0xE2).map(|(v, _)| v == 11).unwrap_or(false);
+                        !is_hdr
+                    }
+                    _ => true,
+                };
+
+                let mode_val = if enable { 11 } else { 1 };
+                let mode_name = if enable { "HDR Game Mode" } else { "Standard Mode" };
+                acer::display_mode(mon, mode_val)?;
+                if enable {
+                    let _ = acer::brightness(mon, 100);
+                }
+                crate::hdr::set_os_hdr(enable);
+
+                let os_hdr_str = if enable { "ON" } else { "OFF" };
+                out = format!("Unified OS + Hardware HDR set to {os_hdr_str}! Display mode set to '{mode_name}' and OS HDR toggled {os_hdr_str}.");
+                Ok(())
+            })?;
+            Ok(out)
+        }
+
+
         "server" => {
             server::run_server()?;
             Ok("Server stopped.".to_string())
         }
+
 
         "send" => {
             if args.is_empty() {

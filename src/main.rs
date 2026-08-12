@@ -3,7 +3,9 @@ mod cli;
 mod ddc;
 mod edid;
 mod energy;
+mod hdr;
 mod idle;
+
 mod monitor;
 mod osd;
 mod pattern;
