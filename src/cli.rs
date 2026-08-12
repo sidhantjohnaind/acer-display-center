@@ -209,8 +209,30 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
 
         "hdr" => {
-            let action = args.first().map(|s| s.as_str()).unwrap_or("on");
-            let filtered: Vec<String> = args.iter().filter(|a| *a != "on" && *a != "off" && *a != "enable" && *a != "disable" && *a != "toggle" && *a != "1" && *a != "0").cloned().collect();
+            let target_sub = args.first().map(|s| s.as_str()).unwrap_or("both");
+            
+            let (mode, action) = match target_sub {
+                "os" => ("os", args.get(1).map(|s| s.as_str()).unwrap_or("on")),
+                "monitor" | "display" | "hardware" => ("monitor", args.get(1).map(|s| s.as_str()).unwrap_or("on")),
+                "both" => ("both", "on"),
+                act => ("both", act),
+            };
+
+            if mode == "os" {
+                let enable = match action {
+                    "on" | "enable" | "1" => true,
+                    "off" | "disable" | "0" => false,
+                    _ => true,
+                };
+                crate::hdr::set_os_hdr(enable);
+                let os_str = if enable { "ON" } else { "OFF" };
+                return Ok(format!("OS-level HDR set to {os_str}."));
+            }
+
+            let filtered: Vec<String> = args.iter()
+                .filter(|a| *a != "os" && *a != "monitor" && *a != "display" && *a != "hardware" && *a != "both" && *a != "on" && *a != "off" && *a != "enable" && *a != "disable" && *a != "toggle" && *a != "1" && *a != "0")
+                .cloned()
+                .collect();
             let spec = parse_optional_specifier(&filtered);
             let mut out = String::new();
 
@@ -231,14 +253,19 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                 if enable {
                     let _ = acer::brightness(mon, 100);
                 }
-                crate::hdr::set_os_hdr(enable);
-
-                let os_hdr_str = if enable { "ON" } else { "OFF" };
-                out = format!("Unified OS + Hardware HDR set to {os_hdr_str}! Display mode set to '{mode_name}' and OS HDR toggled {os_hdr_str}.");
+                if mode == "both" {
+                    crate::hdr::set_os_hdr(enable);
+                    let os_hdr_str = if enable { "ON" } else { "OFF" };
+                    out = format!("Unified OS + Hardware HDR set to {os_hdr_str}! Display mode set to '{mode_name}' and OS HDR toggled {os_hdr_str}.");
+                } else {
+                    let hdr_str = if enable { "ON" } else { "OFF" };
+                    out = format!("Hardware Display HDR set to {hdr_str} ('{mode_name}').");
+                }
                 Ok(())
             })?;
             Ok(out)
         }
+
 
 
         "server" => {
