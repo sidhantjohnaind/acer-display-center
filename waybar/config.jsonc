@@ -1,0 +1,13 @@
+{
+  "custom/acer_monitor": {
+    "format": "󰍹 {percentage}%",
+    "exec": "acer_monitor_cli get 0x10 | awk '{print $2}' | cut -d= -f2",
+    "interval": 5,
+    "on-scroll-up": "acer_monitor_cli brightness +5 --osd",
+    "on-scroll-down": "acer_monitor_cli brightness -5 --osd",
+    "on-click": "acer_monitor_cli mute toggle --osd",
+    "on-click-right": "./rofi-acer.sh",
+    "tooltip": true,
+    "tooltip-format": "Acer Monitor Control (Scroll: Brightness | Left Click: Mute | Right Click: Quick Menu)"
+  }
+}

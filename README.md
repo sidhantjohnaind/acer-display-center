@@ -101,28 +101,86 @@ powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "$env:LocalAppData\
 ```
 
 
-### Building from Source & ARM64 Cross-Compilation
+### ⚙️ Building from Source
+
+#### 1. Prerequisites & Toolchain Setup
+
+First, install the Rust compiler and toolchain if you haven't already:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Linux Prerequisites**:
+Ensure `build-essential`, `pkg-config`, and the `i2c-dev` kernel module are installed:
+```bash
+sudo apt update && sudo apt install -y build-essential pkg-config
+sudo modprobe i2c-dev
+```
+
+#### 2. Native Compilation
+
+Clone the repository and build the optimized release binary:
+```bash
+git clone https://github.com/sidhantjohnaind/acer_monitor_cli.git
+cd acer_monitor_cli
+cargo build --release
+```
+
+- **Linux Output**: `target/release/acer_monitor_cli`
+- **Windows Output**: `target/release/acer_monitor_cli.exe`
+
+#### 3. Cross-Compiling for Other Architectures
+
+You can cross-compile `acer_monitor_cli` for Linux ARM64 (Raspberry Pi), Linux RISC-V 64, and Windows on ARM:
 
 ```bash
-# Native Linux x86_64 build
-cargo build --release
-
-# Linux ARM64 / Raspberry Pi (aarch64)
+# 🐧 Linux ARM64 / Raspberry Pi (aarch64)
+sudo apt install -y gcc-aarch64-linux-gnu
 rustup target add aarch64-unknown-linux-gnu
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 cargo build --release --target aarch64-unknown-linux-gnu
+# Binary: target/aarch64-unknown-linux-gnu/release/acer_monitor_cli
 
-# Linux RISC-V 64 (riscv64gc)
+# 🧪 Linux RISC-V 64 (riscv64gc)
+sudo apt install -y gcc-riscv64-linux-gnu
 rustup target add riscv64gc-unknown-linux-gnu
-CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER=riscv64-linux-gnu-gcc cargo build --release --target riscv64gc-unknown-linux-gnu
+CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER=riscv64-linux-gnu-gcc \
+cargo build --release --target riscv64gc-unknown-linux-gnu
+# Binary: target/riscv64gc-unknown-linux-gnu/release/acer_monitor_cli
 
-# Windows x86_64 build
+# 🪟 Windows x86_64 (from Linux)
+sudo apt install -y mingw-w64
+rustup target add x86_64-pc-windows-gnu
 cargo build --release --target x86_64-pc-windows-gnu
+# Binary: target/x86_64-pc-windows-gnu/release/acer_monitor_cli.exe
 
-
-# Windows on ARM / Snapdragon X Elite (ARM64)
+# 💻 Windows on ARM / Snapdragon X Elite (ARM64)
 rustup target add aarch64-pc-windows-msvc
 cargo build --release --target aarch64-pc-windows-msvc
+# Binary: target/aarch64-pc-windows-msvc/release/acer_monitor_cli.exe
 ```
+
+---
+
+## 🧩 Desktop Widgets & Integrations
+
+`amctl` includes native widgets and shortcuts tailored for every desktop environment:
+
+1. **Linux GNOME Shell Quick Settings Extension** (`gnome-extension/`):
+   - Adds sliders and popup submenus for Brightness, Contrast, Volume, Presets, Inputs, Black Boost, and Solar schedule to the top bar.
+   - Install with `./install-gnome-extension.sh`.
+
+2. **Windows Taskbar System Tray Widget** (`acer-tray.ps1`):
+   - Adds a native notification area system tray icon next to the Windows clock with right-click popups.
+   - Installed automatically via `.\install.ps1`.
+
+3. **Rofi / Dmenu Quick Launcher Widget** (`rofi-acer.sh`):
+   - Fast keyboard-driven menu for i3, Sway, Hyprland, XFCE, and Openbox window managers.
+   - Launch anytime with `./rofi-acer.sh`.
+
+4. **Waybar Status Bar Widget** (`waybar/`):
+   - Custom widget configuration (`config.jsonc`) and glassmorphic CSS (`style.css`) for Hyprland/Sway bars.
+
 
 
 ---
