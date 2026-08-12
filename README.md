@@ -390,8 +390,25 @@ Use the included [`amctl.ahk`](file:///home/sidhant-aind/Projects/acer_monitor_c
 
 ---
 
+## 🗑️ Uninstallation
+
+To completely remove `amctl`, background daemons, desktop entries, and GNOME extensions:
+
+### Linux / macOS
+```bash
+./uninstall.sh
+```
+
+### Windows (PowerShell)
+```powershell
+.\uninstall.ps1
+```
+
+---
+
 ## 📄 License
 
 Licensed under the [MIT License](LICENSE).
+
 
 
