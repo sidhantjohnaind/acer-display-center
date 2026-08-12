@@ -1,100 +1,95 @@
 # Acer Monitor Control CLI & Daemon Suite (`amctl`) 🖥️⚡
 
-> A powerful, hyper-fast Rust CLI (`amctl`) and background daemon suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Linux and Windows.
+[![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue.svg)]()
+
+> A feature-rich, high-performance Rust CLI (`amctl` / `acer_monitor_cli`), IPC daemon, and system integration suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Linux and Windows.
 
 ---
 
-## 🚀 Key Features
+## 📋 Table of Contents
 
-* **🖥️ Complete Display Controls**: Adjust Brightness, Contrast, Volume, Mute, Power, and Input sources (`DisplayPort`, `HDMI1`, `HDMI2`, `Auto`, `next`).
-* **🎮 Acer Hardware Banked VCPs**: Control Black Boost, OverDrive (`od`), AimPoint Crosshairs (`aim`), Blue Light Filter (`bluelight`), Gamma, Color Temperature (`colortemp`), and Refresh Rate Counter (`refreshnum`).
-* **☀️ Solar Circadian Auto-Scheduler**: Automatically shifts brightness and color temperature at sunset/sunrise based on GPS coordinates.
-* **🌙 Smart Inactivity Idle Dimmer**: Dims screen after user inactivity, but **automatically pauses dimming when watching YouTube or movies** (via MPRIS D-Bus checks).
-* **⚡ Sub-Millisecond IPC Socket Daemon**: Runs background daemon (`server`) listening on `/tmp/acer_monitor.sock` for instant hotkey execution.
-* **📊 Hardware EDID Inspector**: Decodes 10-bit color, 1440p native timings, 27.2" screen size, manufacture year, and serial numbers.
-* **💡 Real-Time Energy Calculator**: Calculates live wattage draw ($15.2\text{W}$) and estimated yearly electricity cost ($\$6.68/\text{year}$).
-* **🎨 Diagnostic Test Patterns**: Full-screen RGB, alignment grid, and 0-100% grayscale gradient patterns.
-* **🎛️ One-Touch Hardware Presets**: Switch native monitor OSD modes (`user`, `standard`, `eco`, `graphics`, `hdr`, `racing`, `sports`).
-* **⚙️ Multi-Monitor Support**: Bulk target `all`, model name substring matching (`VG271U`), sync (`sync`), and relative brightness balance (`balance`).
+- [✨ Key Features](#-key-features)
+- [📦 Installation](#-installation)
+  - [Linux Quick Install](#linux-quick-install)
+  - [Ubuntu / GNOME Top Bar Extension](#ubuntu--gnome-top-bar-extension)
+  - [Windows Quick Install](#windows-quick-install)
+  - [Building from Source](#building-from-source)
+- [🛠️ Usage & Command Reference](#️-usage--command-reference)
+  - [Display & Audio Basics](#display--audio-basics)
+  - [Hardware Presets & Acer Banked VCP Controls](#hardware-presets--acer-banked-vcp-controls)
+  - [Smooth Fading & Transitions](#smooth-fading--transitions)
+  - [Query, Information & Diagnostics](#query-information--diagnostics)
+  - [Multi-Monitor Management](#multi-monitor-management)
+  - [Automation & Background Daemons](#automation--background-daemons)
+  - [Profile Management](#profile-management)
+  - [Shell & Status Bar Integration](#shell--status-bar-integration)
+- [⚡ Advanced: Raw Banked VCP Control](#-advanced-raw-banked-vcp-control)
+- [📄 License](#-license)
+
+---
+
+## ✨ Key Features
+
+* **🖥️ Full Display & Audio Control**: Adjust Brightness, Contrast, Volume, Mute, Power, and Input source (`DP`, `HDMI1`, `HDMI2`, `Auto`, `Next`).
+* **🎮 Acer Hardware Banked VCPs**: Direct hardware access to Black Boost, OverDrive (`od`), AimPoint Crosshair (`aim`), Blue Light Filter (`bluelight`), Gamma, Color Temperature (`colortemp`), and Refresh Rate Counter (`refreshnum`).
+* **🎛️ One-Touch Hardware Presets**: Apply native monitor OSD modes (`user`, `standard`, `eco`, `graphics`, `action`, `racing`, `sports`, `hdr`, `reading`, `movie`).
+* **🌊 Smooth Parameter Fading**: Transition brightness, contrast, or volume smoothly over custom time durations (`fade`).
+* **☀️ Solar Circadian Auto-Scheduler**: Automatically shifts display brightness and color temperature between day and night based on GPS coordinates.
+* **🌙 Smart Inactivity Idle Dimmer**: Dims screen after inactivity, with **automatic inhibition during media playback** via MPRIS D-Bus checks.
+* **⚡ Sub-Millisecond IPC Socket Server**: Background server daemon (`server`) listening on local IPC for instant hotkey handling (`send`).
+* **🎮 Auto-Profile Switcher**: Automatically applies monitor profile JSONs when specified applications/games launch (`auto-profile`).
+* **👀 Hotplug Monitor Watcher**: Monitors connected displays for live hotplug events (`watch-monitors`).
+* **📊 Hardware EDID & VCP Inspector**: Decodes EDID (resolution, screen size, manufacture date, serial numbers) and probes active VCP feature codes with optional `--json` export.
+* **💡 Real-Time Energy Calculator**: Calculates live wattage draw (~15.2W) and estimated annual electricity costs (~$6.68/year).
+* **🎨 Diagnostic Test Patterns**: Renders full-screen RGB, alignment grids, and grayscale gradients for display testing.
+* **⚙️ Multi-Monitor Support**: Target specific displays by index (`0`), model substring (`VG271U`), or all connected displays (`all`). Includes `sync` and brightness `balance`.
+* **🧩 Desktop Integrations**: Built-in Systemd User Service, Desktop Launcher generator, Waybar status bar config generator, shell completion scripts (`bash`, `zsh`, `fish`), and an Ubuntu GNOME Shell Top Bar Extension.
 
 ---
 
 ## 📦 Installation
 
 ### Linux Quick Install
+
+Make sure your user is in the `i2c` group and `i2c-dev` kernel module is enabled (`sudo modprobe i2c-dev`).
+
 Run the automated installation script:
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
-Or install manually:
+
+The script builds the release binary and installs `acer_monitor_cli` along with convenience symlinks `amctl` and `amc` into `/usr/local/bin/`. It also registers the desktop entry and systemd user service.
+
+To enable the systemd background service:
 ```bash
-cargo build --release
-sudo cp target/release/acer_monitor_cli /usr/local/bin/acer_monitor_cli
-sudo ln -sf /usr/local/bin/acer_monitor_cli /usr/local/bin/amctl
-amctl install-desktop
-amctl install-service
+systemctl --user enable --now acer-monitor
+```
+
+### Ubuntu / GNOME Top Bar Extension
+
+To add an interactive Acer Monitor Control icon to your GNOME Shell top bar:
+```bash
+chmod +x install-gnome-extension.sh
+./install-gnome-extension.sh
 ```
 
 ### Windows Quick Install
-Run PowerShell as Administrator or User:
+
+Run PowerShell or launch `install.bat`:
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\install.ps1
 ```
-This installs `amctl.exe` to `%AppData%\Local\Programs\acer_monitor_cli`, adds it to your `%PATH%`, and creates a Start Menu shortcut.
 
----
+This installs `acer_monitor_cli.exe` into `%LocalAppData%\Programs\acer_monitor_cli`, adds it to your user `PATH`, creates a Start Menu shortcut, and optionally registers a Task Scheduler logon trigger for the Smart Idle Dimmer.
 
-## 🛠️ Usage & Commands
-
-### Basic Controls
-```bash
-amctl brightness 80            # Set brightness to 80%
-amctl brightness +10 --osd     # Relative +10% with visual OSD banner
-amctl volume -5 --osd          # Decrease volume with OSD banner
-amctl mute toggle              # Toggle mute/unmute
-amctl input next               # Cycle to next input channel
-amctl input dp                 # Switch directly to DisplayPort
-```
-
-### Hardware Presets & Color Controls
-```bash
-amctl preset hdr               # Apply hardware HDR gaming mode
-amctl preset eco               # Apply hardware ECO power saving mode
-amctl blackboost 5             # Set Black Boost level (0-10)
-amctl bluelight 3              # Set 70% Blue Light Filter
-amctl colortemp warm           # Set warm color temperature
-amctl od 2                     # Set Extreme OverDrive
-```
-
-### Hardware Info & Energy Calculations
-```bash
-amctl edid                     # Display hardware panel EDID readout
-amctl energy                   # Show live wattage draw and yearly cost
-amctl diag                     # Generate full system diagnostic report
-amctl test-pattern gradient    # Render grayscale step gradient test
-```
-
-### Automation Daemons
-```bash
-# Solar circadian schedule
-amctl solar-schedule --lat 28.61 --lon 77.20 --day-b 90 --night-b 15 --night-ct warm
-
-# Smart Idle Dimmer (5 mins idle, dim to 10%, video playback inhibits dimming)
-amctl idle-dimmer --idle-secs 300 --dim-to 10
-
-# IPC Server Daemon (instant sub-millisecond hotkey IPC)
-amctl server
-amctl send brightness +10
-```
-
----
-
-## ⚙️ Building from Source
+### Building from Source
 
 ```bash
-# Build Linux release binary
+# Native Linux build
 cargo build --release
 
 # Cross-compile Windows binary on Linux
@@ -103,5 +98,145 @@ cargo build --release --target x86_64-pc-windows-gnu
 
 ---
 
+## 🛠️ Usage & Command Reference
+
+You can use `amctl`, `amc`, or `acer_monitor_cli` interchangeably.
+
+### Display & Audio Basics
+
+```bash
+amctl brightness 80            # Set brightness to 80%
+amctl brightness +10 --osd     # Increase brightness by 10% with visual OSD banner
+amctl contrast 75              # Set contrast to 75%
+amctl volume 50                # Set volume to 50%
+amctl volume -5 --osd          # Decrease volume by 5% with OSD banner
+amctl mute toggle --osd        # Toggle mute/unmute with OSD banner
+amctl input next               # Cycle to the next input channel
+amctl input dp                 # Switch directly to DisplayPort (dp, hdmi1, hdmi2, auto)
+amctl power off                # Turn off monitor display power (on | off)
+```
+
+### Hardware Presets & Acer Banked VCP Controls
+
+```bash
+amctl preset hdr               # Apply hardware HDR mode (user, standard, eco, graphics, action, racing, sports, hdr, reading, movie)
+amctl blackboost 5             # Adjust Black Boost level (0-10)
+amctl bluelight 70             # Set Blue Light filter (0, 50, 60, 70, 80)
+amctl colortemp warm           # Set color temperature (warm, normal, cool, bluelight, user)
+amctl gamma 22                 # Set gamma level (18, 20, 22, 24, 26)
+amctl od 2                     # Set OverDrive level (0=Off, 1=Normal, 2=Extreme)
+amctl aim 1                    # Set AimPoint crosshair overlay type (0=Off, 1-3=Crosshair style)
+amctl refreshnum on            # Enable hardware refresh rate counter OSD (on | off)
+amctl indicator off            # Turn off front power LED indicator (on | off)
+amctl keylock on               # Lock front panel OSD buttons (on | off)
+amctl unlock                   # Emergency unlock OSD buttons and power button
+amctl reset                    # Factory reset monitor settings
+```
+
+### Smooth Fading & Transitions
+
+Fades brightness, contrast, or volume smoothly from a starting value to an ending value over a specified duration in milliseconds (default: 1000ms):
+
+```bash
+amctl fade brightness 10 90 2000    # Fade brightness from 10% to 90% over 2 seconds
+amctl fade volume 80 10 1500        # Fade volume from 80% down to 10% over 1.5 seconds
+```
+
+### Query, Information & Diagnostics
+
+```bash
+amctl list                     # List connected DDC/CI monitors
+amctl list --json              # Output monitor list in JSON format
+amctl info                     # Print detailed capabilities and current VCP values
+amctl info --json              # Output detailed monitor info as JSON
+amctl caps                     # Display raw MCCS capability string report
+amctl scan                     # Probe common VCP feature codes
+amctl scan --json              # Output probe scan results as JSON
+amctl edid                     # Display hardware EDID panel readout
+amctl diag                     # Generate a full system diagnostic report
+amctl energy                   # Estimate current wattage draw and annual energy cost
+amctl test-pattern gradient    # Render diagnostic test pattern (red, green, blue, white, black, grid, gradient)
+amctl get 0x10                 # Read raw VCP code (e.g. 0x10 = Brightness)
+amctl get-bluelight            # Get current Blue Light level
+amctl get-gamma                # Get current Gamma level
+amctl get-colortemp            # Get current Color Temp
+amctl get-od                   # Get current OverDrive level
+amctl get-blackboost           # Get current Black Boost level
+```
+
+### Multi-Monitor Management
+
+Pass a monitor specifier at the end of any command to target specific displays:
+- **By Index**: `0`, `1`, etc.
+- **By Model Substring**: `VG271U`, `Nitro`, etc.
+- **All Monitors**: `all`
+
+```bash
+amctl brightness 100 0         # Set brightness of monitor 0 to 100%
+amctl preset eco VG271U        # Apply ECO preset to monitor matching 'VG271U'
+amctl brightness 50 all        # Set brightness to 50% across ALL monitors
+amctl sync                     # Sync secondary monitors' brightness & contrast to master monitor
+amctl balance --offset -15     # Balance secondary monitors with relative offset to master display
+```
+
+### Automation & Background Daemons
+
+```bash
+# Solar circadian schedule based on latitude/longitude coordinates
+amctl solar-schedule --lat 28.61 --lon 77.20 --day-b 90 --night-b 15 --night-ct warm
+
+# Smart Idle Dimmer (dims display after 5 mins idle, pauses dimming when watching video via MPRIS)
+amctl idle-dimmer --idle-secs 300 --dim-to 10
+
+# Auto-Profile Switcher (applies profile JSON when process is active)
+amctl auto-profile --rule "hl2.exe:gaming.json"
+
+# Hotplug Monitor Watcher (detects display connection changes)
+amctl watch-monitors
+
+# IPC Server Daemon (runs IPC socket server for sub-millisecond hotkey commands)
+amctl server
+amctl send brightness +10      # Send command to active server daemon
+```
+
+### Profile Management
+
+Save monitor settings to JSON configuration files and restore them at any time:
+
+```bash
+amctl profile save workspace.json    # Save current monitor settings to JSON
+amctl profile load workspace.json    # Restore settings from JSON file
+```
+
+### Shell & Status Bar Integration
+
+```bash
+# Output Waybar configuration block
+amctl waybar-config
+
+# Generate shell completion script
+amctl completions bash > /etc/bash_completion.d/amctl
+amctl completions zsh > ~/.zsh/completion/_amctl
+amctl completions fish > ~/.config/fish/completions/amctl.fish
+```
+
+---
+
+## ⚡ Advanced: Raw Banked VCP Control
+
+Acer hardware utilizes custom banked register mapping over VCP codes `0xE0`, `0xE7`, and `0xE9`. Advanced users can directly read or write banked registers:
+
+```bash
+# Write selector register and set bank value
+amctl rawbank e0 0x04 2        # Write OverDrive selector (0x04) = 2 (Extreme)
+
+# Read banked register selector value
+amctl getbank e7 0x00          # Read Blue Light selector (0x00)
+```
+
+---
+
 ## 📄 License
-Licensed under MIT.
+
+Licensed under the [MIT License](LICENSE).
+
