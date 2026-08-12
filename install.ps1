@@ -23,6 +23,13 @@ $ExeTarget = Join-Path $InstallDir "acer_monitor_cli.exe"
 Copy-Item -Path $ExeSource -Destination $ExeTarget -Force
 Write-Host "[+] Installed binary to: $ExeTarget" -ForegroundColor Green
 
+# Copy Taskbar System Tray Application script
+if (Test-Path "acer-tray.ps1") {
+    $TrayTarget = Join-Path $InstallDir "acer-tray.ps1"
+    Copy-Item -Path "acer-tray.ps1" -Destination $TrayTarget -Force
+    Write-Host "[+] Installed System Tray Widget script to: $TrayTarget" -ForegroundColor Green
+}
+
 # Add to User PATH if not already added
 $UserPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
 if ($UserPath -notlike "*acer_monitor_cli*") {
@@ -38,6 +45,13 @@ $BatContent = "@echo off`r`n`"$ExeTarget`" brightness 50 --osd`r`n"
 Set-Content -Path $ShortcutPath -Value $BatContent
 Write-Host "[+] Created Start Menu Shortcut: $ShortcutPath" -ForegroundColor Green
 
+# Register Windows Startup Shortcut for System Tray Widget
+$StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
+$TrayBatPath = Join-Path $StartupDir "Acer Monitor Tray.bat"
+$TrayBatContent = "@echo off`r`nstart /b powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$InstallDir\acer-tray.ps1`"`r`n"
+Set-Content -Path $TrayBatPath -Value $TrayBatContent
+Write-Host "[+] Registered Windows System Tray Widget auto-start in Startup folder." -ForegroundColor Green
+
 # Register Windows Task Scheduler task for Smart Idle Dimmer
 $TaskName = "AcerMonitorIdleDimmer"
 $Action = New-ScheduledTaskAction -Execute $ExeTarget -Argument "idle-dimmer --idle-secs 300 --dim-to 10"
@@ -51,4 +65,7 @@ try {
 
 Write-Host ""
 Write-Host "=== Installation Complete! ===" -ForegroundColor Cyan
-Write-Host "Run 'acer_monitor_cli.exe --help' in PowerShell or Command Prompt to get started."
+Write-Host "The Windows Taskbar System Tray Widget is ready and will start automatically on logon."
+Write-Host "You can also launch it manually anytime with:"
+Write-Host "  powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$InstallDir\acer-tray.ps1`""
+

@@ -76,15 +76,24 @@ chmod +x install-gnome-extension.sh
 ./install-gnome-extension.sh
 ```
 
-### Windows Quick Install
+### Windows Quick Install & Taskbar System Tray Widget
 
-Run PowerShell or launch `install.bat`:
+Run PowerShell as User or Administrator, or launch `install.bat`:
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\install.ps1
 ```
 
-This installs `acer_monitor_cli.exe` into `%LocalAppData%\Programs\acer_monitor_cli`, adds it to your user `PATH`, creates a Start Menu shortcut, and optionally registers a Task Scheduler logon trigger for the Smart Idle Dimmer.
+This performs the complete Windows setup:
+1. Installs `acer_monitor_cli.exe` into `%LocalAppData%\Programs\acer_monitor_cli` and adds it to your user `PATH`.
+2. Installs and auto-starts the **Windows System Tray Widget** (`acer-tray.ps1`) in the Windows Taskbar Notification Area (next to the clock).
+3. Registers a Start Menu shortcut and Task Scheduler logon trigger for the Smart Idle Dimmer.
+
+To launch or restart the Windows System Tray Widget manually at any time:
+```powershell
+powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "$env:LocalAppData\Programs\acer_monitor_cli\acer-tray.ps1"
+```
+
 
 ### Building from Source
 
