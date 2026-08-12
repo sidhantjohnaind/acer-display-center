@@ -3,8 +3,9 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue.svg)]()
+[![Arch](https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64%20%7C%20RISC--V%2064-purple.svg)]()
 
-> A feature-rich, high-performance Rust CLI (`amctl` / `acer_monitor_cli`), IPC daemon, and system integration suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Linux and Windows.
+> A feature-rich, high-performance Rust CLI (`amctl` / `acer_monitor_cli`), IPC daemon, and system integration suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Linux (x86_64, ARM64, RISC-V 64) and Windows (x86_64, ARM64).
 
 ---
 
@@ -14,8 +15,8 @@
 - [📦 Installation](#-installation)
   - [Linux Quick Install](#linux-quick-install)
   - [Ubuntu / GNOME Top Bar Extension](#ubuntu--gnome-top-bar-extension)
-  - [Windows Quick Install](#windows-quick-install)
-  - [Building from Source](#building-from-source)
+  - [Windows Quick Install & Taskbar System Tray Widget](#windows-quick-install--taskbar-system-tray-widget)
+  - [Building from Source & Architecture Targets](#building-from-source--architecture-targets)
 - [🛠️ Usage & Command Reference](#️-usage--command-reference)
   - [Display & Audio Basics](#display--audio-basics)
   - [Hardware Presets & Acer Banked VCP Controls](#hardware-presets--acer-banked-vcp-controls)
@@ -45,7 +46,12 @@
 * **💡 Real-Time Energy Calculator**: Calculates live wattage draw (~15.2W) and estimated annual electricity costs (~$6.68/year).
 * **🎨 Diagnostic Test Patterns**: Renders full-screen RGB, alignment grids, and grayscale gradients for display testing.
 * **⚙️ Multi-Monitor Support**: Target specific displays by index (`0`), model substring (`VG271U`), or all connected displays (`all`). Includes `sync` and brightness `balance`.
-* **🧩 Desktop Integrations**: Built-in Systemd User Service, Desktop Launcher generator, Waybar status bar config generator, shell completion scripts (`bash`, `zsh`, `fish`), and an Ubuntu GNOME Shell Top Bar Extension.
+* **🧩 Desktop Integrations**:
+  - **Linux GNOME Shell Extension**: Top bar Quick Settings widget (`acer-monitor@sidhant`) with sliders & submenus.
+  - **Windows Taskbar System Tray Widget**: Native Windows Notification Area app (`acer-tray.ps1`).
+  - **Shell & Status Bar**: Systemd User Service, Desktop Launcher, Waybar JSON config, and shell completion scripts (`bash`, `zsh`, `fish`).
+* **🌍 Multi-Architecture Support**: Native cross-compilation binaries for **x86_64**, **ARM64 (aarch64)**, and **RISC-V 64 (riscv64gc)**.
+
 
 ---
 
