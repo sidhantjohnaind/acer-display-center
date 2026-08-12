@@ -95,15 +95,24 @@ powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "$env:LocalAppData\
 ```
 
 
-### Building from Source
+### Building from Source & ARM64 Cross-Compilation
 
 ```bash
-# Native Linux build
+# Native Linux x86_64 build
 cargo build --release
 
-# Cross-compile Windows binary on Linux
+# Linux ARM64 / Raspberry Pi (aarch64)
+rustup target add aarch64-unknown-linux-gnu
+cargo build --release --target aarch64-unknown-linux-gnu
+
+# Windows x86_64 build
 cargo build --release --target x86_64-pc-windows-gnu
+
+# Windows on ARM / Snapdragon X Elite (ARM64)
+rustup target add aarch64-pc-windows-msvc
+cargo build --release --target aarch64-pc-windows-msvc
 ```
+
 
 ---
 
