@@ -105,8 +105,13 @@ cargo build --release
 rustup target add aarch64-unknown-linux-gnu
 cargo build --release --target aarch64-unknown-linux-gnu
 
+# Linux RISC-V 64 (riscv64gc)
+rustup target add riscv64gc-unknown-linux-gnu
+CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER=riscv64-linux-gnu-gcc cargo build --release --target riscv64gc-unknown-linux-gnu
+
 # Windows x86_64 build
 cargo build --release --target x86_64-pc-windows-gnu
+
 
 # Windows on ARM / Snapdragon X Elite (ARM64)
 rustup target add aarch64-pc-windows-msvc

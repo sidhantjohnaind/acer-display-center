@@ -3,9 +3,11 @@ set -e
 
 echo "=== Acer Monitor Control (amctl) Installer (Linux) ==="
 
-# Locate release binary (native or ARM64)
+# Locate release binary (native, ARM64, or RISC-V 64)
 BIN_PATH=""
-if [ -f "target/aarch64-unknown-linux-gnu/release/acer_monitor_cli" ]; then
+if [ -f "target/riscv64gc-unknown-linux-gnu/release/acer_monitor_cli" ]; then
+    BIN_PATH="target/riscv64gc-unknown-linux-gnu/release/acer_monitor_cli"
+elif [ -f "target/aarch64-unknown-linux-gnu/release/acer_monitor_cli" ]; then
     BIN_PATH="target/aarch64-unknown-linux-gnu/release/acer_monitor_cli"
 elif [ -f "target/release/acer_monitor_cli" ]; then
     BIN_PATH="target/release/acer_monitor_cli"
@@ -14,6 +16,7 @@ else
     cargo build --release
     BIN_PATH="target/release/acer_monitor_cli"
 fi
+
 
 
 TARGET_DIR="/usr/local/bin"
