@@ -540,7 +540,7 @@ impl eframe::App for AcerQuickSettingsApp {
                     ui.painter().circle_filled(dot_rect.center(), 4.0, accent);
                     ui.add_space(2.0);
 
-                    ui.label(egui::RichText::new("ACER DISPLAY CENTER").strong().size(12.0).color(Color32::WHITE));
+                    ui.label(egui::RichText::new("🖥  ACER DISPLAY CENTER").strong().size(12.0).color(Color32::WHITE));
                     ui.label(egui::RichText::new("·").size(12.0).color(Color32::from_rgb(70, 75, 90)));
                     ui.label(egui::RichText::new("VG271U").size(11.0).color(Color32::from_rgb(148, 163, 184)));
 
@@ -683,10 +683,10 @@ impl eframe::App for AcerQuickSettingsApp {
                 } else {
                     // Pixel-Perfect Segmented Navigation Bar
                     let tabs = [
-                        (Tab::Display, "Display"),
-                        (Tab::Gaming, "Gaming"),
-                        (Tab::Color, "Color"),
-                        (Tab::Tools, "Tools"),
+                        (Tab::Display, "☀️ Display"),
+                        (Tab::Gaming, "🎯 Gaming"),
+                        (Tab::Color, "🎨 Color"),
+                        (Tab::Tools, "🛠 Tools"),
                     ];
 
                     let target_tab_idx = match self.selected_tab {
@@ -951,7 +951,7 @@ impl AcerQuickSettingsApp {
         painter.text(
             Pos2::new(rect.left() + 12.0, rect.top() + 15.0),
             egui::Align2::LEFT_CENTER,
-            "Unified HDR Bridge",
+            "✨ Unified HDR Bridge",
             egui::FontId::proportional(11.5),
             Color32::WHITE,
         );
@@ -1036,7 +1036,7 @@ impl AcerQuickSettingsApp {
         painter.text(
             Pos2::new(rect.left() + 12.0, rect.top() + 15.0),
             egui::Align2::LEFT_CENTER,
-            "Global Hotkeys (Ctrl+Alt+M/H/Up/Down/E)",
+            "⌨  Global Hotkeys (Ctrl+Alt+M/H/Up/Down/E)",
             egui::FontId::proportional(11.5),
             Color32::WHITE,
         );
@@ -1158,7 +1158,7 @@ impl AcerQuickSettingsApp {
     fn render_display_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
         let mut b_val = self.brightness;
         let mut b_change = self.last_b_change;
-        if self.render_slider_card(ui, "Brightness", &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
+        if self.render_slider_card(ui, "☀️ Brightness", &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
             self.last_user_b_edit = Instant::now();
         }
         self.brightness = b_val;
@@ -1168,7 +1168,7 @@ impl AcerQuickSettingsApp {
 
         let mut c_val = self.contrast;
         let mut c_change = self.last_c_change;
-        if self.render_slider_card(ui, "Contrast", &mut c_val, 100, "%", &[40, 50, 60, 75], &mut c_change, accent) {
+        if self.render_slider_card(ui, "🌓 Contrast", &mut c_val, 100, "%", &[40, 50, 60, 75], &mut c_change, accent) {
             self.last_user_c_edit = Instant::now();
         }
         self.contrast = c_val;
@@ -1188,7 +1188,7 @@ impl AcerQuickSettingsApp {
             .inner_margin(Margin::symmetric(12.0, 7.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Volume").strong().size(11.5).color(Color32::WHITE));
+                    ui.label(egui::RichText::new("🔊 Volume").strong().size(11.5).color(Color32::WHITE));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let mute_txt = if self.is_muted { "MUTED" } else { "MUTE" };
                         let mute_color = if self.is_muted { Color32::from_rgb(239, 68, 68) } else { Color32::from_rgb(148, 163, 184) };
@@ -1231,20 +1231,20 @@ impl AcerQuickSettingsApp {
         self.last_v_change = v_change;
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("Display Presets").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🎮  Display Presets").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         // 3x3 Preset Grid with Clean Typography (Zero Missing Font Boxes)
         let presets = [
-            ("Action", "action", 100, 50),
-            ("Standard", "standard", 80, 50),
-            ("HDR Game", "hdr", 100, 50),
-            ("ECO Saver", "eco", 20, 50),
-            ("Racing", "racing", 100, 50),
-            ("Sports", "sports", 100, 50),
-            ("Movie", "movie", 70, 55),
-            ("Graphics", "graphics", 80, 50),
-            ("User", "user", 50, 50),
+            ("⚔️ Action", "action", 100, 50),
+            ("⚡ Standard", "standard", 80, 50),
+            ("✨ HDR Game", "hdr", 100, 50),
+            ("🌱 ECO", "eco", 20, 50),
+            ("🏎️ Racing", "racing", 100, 50),
+            ("⚽ Sports", "sports", 100, 50),
+            ("🎬 Movie", "movie", 70, 55),
+            ("🎨 Graphics", "graphics", 80, 50),
+            ("👤 User", "user", 50, 50),
         ];
 
         let col_w = (ui.available_width() - 8.0) / 3.0;
@@ -1290,10 +1290,10 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("Input Source").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🔌  Input Source").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
-        let inputs = [("DP", "dp"), ("HDMI 1", "hdmi1"), ("HDMI 2", "hdmi2"), ("AUTO", "auto"), ("NEXT", "next")];
+        let inputs = [("🔌 DP", "dp"), ("📺 HDMI 1", "hdmi1"), ("📺 HDMI 2", "hdmi2"), ("🔄 AUTO", "auto"), ("⏭ NEXT", "next")];
         let inp_w = (ui.available_width() - 16.0) / 5.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -1312,10 +1312,10 @@ impl AcerQuickSettingsApp {
     }
 
     fn render_gaming_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
-        ui.label(egui::RichText::new("Response Time (OverDrive)").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("⚡  Response Time (OverDrive)").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
-        let ods = [("Off", 0, "off"), ("Normal", 1, "normal"), ("Extreme", 2, "extreme")];
+        let ods = [("Off", 0, "off"), ("⚡ Normal", 1, "normal"), ("🔥 Extreme", 2, "extreme")];
         let od_w = (ui.available_width() - 8.0) / 3.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -1335,17 +1335,17 @@ impl AcerQuickSettingsApp {
 
         let mut bb_val = self.black_boost;
         let mut bb_change = self.last_bb_change;
-        if self.render_slider_card(ui, "Black Boost (Shadow Enhancer)", &mut bb_val, 10, "", &[0, 3, 5, 8, 10], &mut bb_change, accent) {
+        if self.render_slider_card(ui, "🌑  Black Boost (Shadow Enhancer)", &mut bb_val, 10, "", &[0, 3, 5, 8, 10], &mut bb_change, accent) {
             self.last_user_bb_edit = Instant::now();
         }
         self.black_boost = bb_val;
         self.last_bb_change = bb_change;
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("AimPoint Hardware Crosshair").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🎯  AimPoint Hardware Crosshair").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
-        let aims = [("Off", 0), ("Dot", 1), ("Cross 1", 2), ("Cross 2", 3)];
+        let aims = [("Off", 0), ("🔴 Dot", 1), ("✚ Cross 1", 2), ("✜ Cross 2", 3)];
         let aim_w = (ui.available_width() - 12.0) / 4.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -1362,7 +1362,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("Refresh Rate (Hz) OSD Counter").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("📊  Refresh Rate (Hz) OSD Counter").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let hz_w = (ui.available_width() - 4.0) / 2.0;
@@ -1385,7 +1385,7 @@ impl AcerQuickSettingsApp {
     }
 
     fn render_color_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
-        ui.label(egui::RichText::new("Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🌡️  Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let temps = [
@@ -1412,7 +1412,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🛡️  Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let bls = [("Off", 0), ("50%", 1), ("60%", 2), ("70%", 3), ("80%", 4)];
@@ -1432,7 +1432,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("Gamma Curve").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("📐  Gamma Curve").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let gammas = [("1.8", "18"), ("2.0", "20"), ("2.2 (Std)", "22"), ("2.4", "24"), ("2.6", "26")];
@@ -1452,7 +1452,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("Color Space Profile").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🎨  Color Space Profile").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let spaces = [
@@ -1498,7 +1498,7 @@ impl AcerQuickSettingsApp {
 
         ui.add_space(6.0);
 
-        ui.label(egui::RichText::new("Theme Accent Color").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🎨  Theme Accent Color").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let theme_w = (ui.available_width() - 8.0) / 3.0;
@@ -1516,7 +1516,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("Quick Maintenance").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("⚡  Quick Maintenance").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let half_w = (ui.available_width() - 4.0) / 2.0;
@@ -1524,13 +1524,13 @@ impl AcerQuickSettingsApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let unl_id = egui::Id::new("tool_unlock");
-            if Self::render_card_button(ui, unl_id, "Unlock OSD", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, unl_id, "🔓 Unlock OSD", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.show_toast("OSD Keys Unlocked");
                 self.send_cmd(&["unlock"]);
             }
 
             let lck_id = egui::Id::new("tool_lock");
-            if Self::render_card_button(ui, lck_id, "Lock OSD", false, Vec2::new(half_w, 25.0), Color32::from_rgb(245, 158, 11)).clicked() {
+            if Self::render_card_button(ui, lck_id, "🔒 Lock OSD", false, Vec2::new(half_w, 25.0), Color32::from_rgb(245, 158, 11)).clicked() {
                 self.show_toast("OSD Keys Locked");
                 self.send_cmd(&["keylock", "on"]);
             }
@@ -1540,13 +1540,13 @@ impl AcerQuickSettingsApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let sync_id = egui::Id::new("tool_sync");
-            if Self::render_card_button(ui, sync_id, "Sync All Displays", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, sync_id, "🔄 Sync Displays", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.show_toast("All Displays Synchronized");
                 self.send_cmd(&["sync"]);
             }
 
             let pwr_id = egui::Id::new("tool_pwr_off");
-            if Self::render_card_button(ui, pwr_id, "Turn Display Off", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
+            if Self::render_card_button(ui, pwr_id, "🌙 Display Off", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
                 self.show_toast("Monitor Powering Off (DDC/CI)");
                 self.send_cmd(&["power", "off"]);
             }
@@ -1556,14 +1556,14 @@ impl AcerQuickSettingsApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let dim_id = egui::Id::new("tool_dim");
-            if Self::render_card_button(ui, dim_id, "Dim to 10%", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, dim_id, "🌙 Dim to 10%", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.brightness = 10;
                 self.show_toast("Brightness Dimmed to 10%");
                 self.send_cmd(&["brightness", "10"]);
             }
 
             let max_id = egui::Id::new("tool_max");
-            if Self::render_card_button(ui, max_id, "Max Bright 100%", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, max_id, "☀️ Max 100%", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.brightness = 100;
                 self.show_toast("Brightness set to Maximum 100%");
                 self.send_cmd(&["brightness", "100"]);
@@ -1571,19 +1571,19 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("Diagnostics & Reports").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("📊  Diagnostics & Reports").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let diag_id = egui::Id::new("tool_diag");
-            if Self::render_card_button(ui, diag_id, "Diagnostic Report", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, diag_id, "💻 Diagnostic", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.show_toast("Querying Diagnostics...");
                 self.send_cmd(&["diag"]);
             }
 
             let nrg_id = egui::Id::new("tool_nrg");
-            if Self::render_card_button(ui, nrg_id, "Energy Usage Info", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, nrg_id, "⚡ Energy Info", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.show_toast("Calculating Energy...");
                 self.send_cmd(&["energy"]);
             }
@@ -1593,13 +1593,13 @@ impl AcerQuickSettingsApp {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let grid_id = egui::Id::new("tool_pat_grid");
-            if Self::render_card_button(ui, grid_id, "Grid Pattern", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, grid_id, "📏 Grid Pattern", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.show_toast("Rendering Calibration Grid Pattern");
                 self.send_cmd(&["test-pattern", "grid"]);
             }
 
             let reset_id = egui::Id::new("tool_reset");
-            if Self::render_card_button(ui, reset_id, "Factory Reset", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
+            if Self::render_card_button(ui, reset_id, "⚠️ Factory Reset", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
                 self.show_toast("Monitor Reset to Defaults");
                 self.send_cmd(&["reset"]);
             }
