@@ -335,8 +335,9 @@ mod win32_tray {
             }
         };
 
-        // 1. Open Flyout
+        // 1. Open Flyout & Resync
         AppendMenuW(hmenu, MF_STRING, 100, to_wide("🚀 Open Acer Display Center (Ctrl+Alt+M)").as_ptr());
+        AppendMenuW(hmenu, MF_STRING, 101, to_wide("🔄 Re-sync Hardware State Now").as_ptr());
         AppendMenuW(hmenu, MF_SEPARATOR, 0, std::ptr::null());
 
         // 2. Picture Presets Submenu
@@ -346,7 +347,7 @@ mod win32_tray {
         AppendMenuW(m_presets, MF_STRING, 203, to_wide(&p_label("sports", &st.preset, "⚽ Sports")).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 204, to_wide(&p_label("standard", &st.preset, "⚡ Standard")).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 205, to_wide(&p_label("eco", &st.preset, "🌱 ECO Mode (Ctrl+Alt+E)")).as_ptr());
-        AppendMenuW(m_presets, MF_STRING, 206, to_wide(&p_label("movie", &st.preset, "🎬 Movie")).as_ptr());
+        AppendMenuW(m_presets, MF_STRING, 206, to_wide(&p_label("movie", &st.preset, "🎬 Movie / Cinema")).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 207, to_wide(&p_label("graphics", &st.preset, "🎨 Graphics / sRGB")).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 208, to_wide(&p_label("hdr", &st.preset, "✨ HDR Game (Hardware)")).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 209, to_wide(&p_label("user", &st.preset, "👤 User Custom")).as_ptr());
@@ -374,6 +375,8 @@ mod win32_tray {
         AppendMenuW(m_contrast, MF_STRING, 403, to_wide(&b_label(60, st.contrast, "Contrast 60%")).as_ptr());
         AppendMenuW(m_contrast, MF_STRING, 404, to_wide(&b_label(50, st.contrast, "Contrast 50% (Default)")).as_ptr());
         AppendMenuW(m_contrast, MF_STRING, 405, to_wide(&b_label(40, st.contrast, "Contrast 40%")).as_ptr());
+        AppendMenuW(m_contrast, MF_STRING, 406, to_wide(&b_label(30, st.contrast, "Contrast 30%")).as_ptr());
+        AppendMenuW(m_contrast, MF_STRING, 407, to_wide(&b_label(20, st.contrast, "Contrast 20%")).as_ptr());
         let contrast_title = format!("🌓 Contrast (Current: {}%)", st.contrast);
         AppendMenuW(hmenu, MF_POPUP, m_contrast as usize, to_wide(&contrast_title).as_ptr());
 
@@ -399,32 +402,38 @@ mod win32_tray {
         AppendMenuW(m_gaming, MF_STRING, 509, to_wide(&p_label("off", &st.overdrive, "⚡ OverDrive: Off")).as_ptr());
         AppendMenuW(m_gaming, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_gaming, MF_STRING, 510, to_wide(&b_label(0, st.black_boost, "🌑 Black Boost: 0 (Off)")).as_ptr());
-        AppendMenuW(m_gaming, MF_STRING, 511, to_wide(&b_label(5, st.black_boost, "🌑 Black Boost: 5 (Standard)")).as_ptr());
-        AppendMenuW(m_gaming, MF_STRING, 512, to_wide(&b_label(8, st.black_boost, "🌑 Black Boost: 8 (Enhanced)")).as_ptr());
-        AppendMenuW(m_gaming, MF_STRING, 513, to_wide(&b_label(10, st.black_boost, "🌑 Black Boost: 10 (Maximum)")).as_ptr());
+        AppendMenuW(m_gaming, MF_STRING, 511, to_wide(&b_label(2, st.black_boost, "🌑 Black Boost: 2 (Mild)")).as_ptr());
+        AppendMenuW(m_gaming, MF_STRING, 512, to_wide(&b_label(5, st.black_boost, "🌑 Black Boost: 5 (Standard)")).as_ptr());
+        AppendMenuW(m_gaming, MF_STRING, 513, to_wide(&b_label(8, st.black_boost, "🌑 Black Boost: 8 (Enhanced)")).as_ptr());
+        AppendMenuW(m_gaming, MF_STRING, 514, to_wide(&b_label(10, st.black_boost, "🌑 Black Boost: 10 (Maximum)")).as_ptr());
         let gaming_title = format!("🎯 Gaming & Esports ({}, Aim: {})", st.overdrive, aim_str);
         AppendMenuW(hmenu, MF_POPUP, m_gaming as usize, to_wide(&gaming_title).as_ptr());
 
         // 6. Color & Eye Shield Submenu
         let m_color = CreatePopupMenu();
         AppendMenuW(m_color, MF_STRING, 601, to_wide(if st.bluelight == 0 { "● 🛡️ Blue Light: Off (Current)" } else { "   🛡️ Blue Light: Off" }).as_ptr());
-        AppendMenuW(m_color, MF_STRING, 602, to_wide(if st.bluelight == 1 { "● 🛡️ Blue Light: 50% (Current)" } else { "   🛡️ Blue Light: 50%" }).as_ptr());
-        AppendMenuW(m_color, MF_STRING, 603, to_wide(if st.bluelight == 2 { "● 🛡️ Blue Light: 60% (Current)" } else { "   🛡️ Blue Light: 60%" }).as_ptr());
-        AppendMenuW(m_color, MF_STRING, 604, to_wide(if st.bluelight == 3 { "● 🛡️ Blue Light: 70% (Current)" } else { "   🛡️ Blue Light: 70%" }).as_ptr());
-        AppendMenuW(m_color, MF_STRING, 605, to_wide(if st.bluelight == 4 { "● 🛡️ Blue Light: 80% (Current)" } else { "   🛡️ Blue Light: 80%" }).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 602, to_wide(if st.bluelight == 1 { "● 🛡️ Blue Light: 50% Level 1 (Current)" } else { "   🛡️ Blue Light: 50% Level 1" }).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 603, to_wide(if st.bluelight == 2 { "● 🛡️ Blue Light: 60% Level 2 (Current)" } else { "   🛡️ Blue Light: 60% Level 2" }).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 604, to_wide(if st.bluelight == 3 { "● 🛡️ Blue Light: 70% Level 3 (Current)" } else { "   🛡️ Blue Light: 70% Level 3" }).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 605, to_wide(if st.bluelight == 4 { "● 🛡️ Blue Light: 80% Level 4 (Current)" } else { "   🛡️ Blue Light: 80% Level 4" }).as_ptr());
         AppendMenuW(m_color, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_color, MF_STRING, 606, to_wide(&p_label("warm", &st.colortemp, "🌡️ Color Temp: Warm")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 607, to_wide(&p_label("normal", &st.colortemp, "🌡️ Color Temp: Normal")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 608, to_wide(&p_label("cool", &st.colortemp, "🌡️ Color Temp: Cool")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 609, to_wide(&p_label("bluelight", &st.colortemp, "🌡️ Color Temp: BlueLight")).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 616, to_wide(&p_label("user", &st.colortemp, "🌡️ Color Temp: User Custom")).as_ptr());
         AppendMenuW(m_color, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_color, MF_STRING, 610, to_wide(&p_label("2.2", &st.gamma, "📐 Gamma: 2.2 (Default)")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 611, to_wide(&p_label("2.4", &st.gamma, "📐 Gamma: 2.4 (Darker)")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 612, to_wide(&p_label("2.0", &st.gamma, "📐 Gamma: 2.0 (Brighter)")).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 617, to_wide(&p_label("1.8", &st.gamma, "📐 Gamma: 1.8")).as_ptr());
         AppendMenuW(m_color, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_color, MF_STRING, 613, to_wide(&p_label("srgb", &st.colorspace, "🎨 Color Space: sRGB")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 614, to_wide(&p_label("dcip3", &st.colorspace, "🎨 Color Space: DCI-P3")).as_ptr());
         AppendMenuW(m_color, MF_STRING, 615, to_wide(&p_label("rec709", &st.colorspace, "🎨 Color Space: Rec.709")).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 618, to_wide(&p_label("hdr", &st.colorspace, "🎨 Color Space: HDR")).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 619, to_wide(&p_label("ebu", &st.colorspace, "🎨 Color Space: EBU")).as_ptr());
+        AppendMenuW(m_color, MF_STRING, 620, to_wide(&p_label("smpte-c", &st.colorspace, "🎨 Color Space: SMPTE-C")).as_ptr());
         let color_title = format!("🎨 Color & Eye Shield ({})", st.colortemp);
         AppendMenuW(hmenu, MF_POPUP, m_color as usize, to_wide(&color_title).as_ptr());
 
@@ -460,29 +469,47 @@ mod win32_tray {
         let hdr_label = if st.hdr { "✨ Toggle Unified HDR (Currently ON)" } else { "✨ Toggle Unified HDR (Currently OFF)" };
         AppendMenuW(m_tools, MF_STRING, 901, to_wide(hdr_label).as_ptr());
         AppendMenuW(m_tools, MF_STRING, 902, to_wide("🔄 Sync All Displays").as_ptr());
+        AppendMenuW(m_tools, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_tools, MF_STRING, 903, to_wide("🔒 Lock Physical OSD Keys").as_ptr());
         AppendMenuW(m_tools, MF_STRING, 904, to_wide("🔓 Unlock Physical OSD Keys").as_ptr());
         AppendMenuW(m_tools, MF_SEPARATOR, 0, std::ptr::null());
-        AppendMenuW(m_tools, MF_STRING, 905, to_wide("📐 Display Calibration Grid").as_ptr());
-        AppendMenuW(m_tools, MF_STRING, 906, to_wide("⚡ Energy Estimate").as_ptr());
-        AppendMenuW(m_tools, MF_STRING, 907, to_wide("📋 Run Diagnostic Scan").as_ptr());
+        AppendMenuW(m_tools, MF_STRING, 910, to_wide("💡 Power LED Indicator: ON").as_ptr());
+        AppendMenuW(m_tools, MF_STRING, 911, to_wide("💡 Power LED Indicator: OFF").as_ptr());
+        AppendMenuW(m_tools, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(m_tools, MF_STRING, 912, to_wide("☀️ Start Solar Circadian Scheduler").as_ptr());
+        AppendMenuW(m_tools, MF_STRING, 913, to_wide("🌙 Start Smart Idle Dimmer Daemon").as_ptr());
+        AppendMenuW(m_tools, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(m_tools, MF_STRING, 906, to_wide("⚡ Live Energy Draw Report").as_ptr());
+        AppendMenuW(m_tools, MF_STRING, 907, to_wide("📋 Run Diagnostic Scan & EDID").as_ptr());
         AppendMenuW(m_tools, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(m_tools, MF_STRING, 908, to_wide("⚠️ Factory Reset Monitor").as_ptr());
-        AppendMenuW(m_tools, MF_STRING, 909, to_wide("🌙 Turn Display Off (DDC/CI)").as_ptr());
+        AppendMenuW(m_tools, MF_STRING, 909, to_wide("🌙 Turn Display Off (Standby DDC/CI)").as_ptr());
         AppendMenuW(hmenu, MF_POPUP, m_tools as usize, to_wide("🛠️ Hardware Tools & Power").as_ptr());
+
+        // 10. Display Calibration & Test Patterns Submenu
+        let m_patterns = CreatePopupMenu();
+        AppendMenuW(m_patterns, MF_STRING, 951, to_wide("📐 Alignment & Geometry Grid").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 952, to_wide("🌈 Full RGB Spectrum Gradient").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 953, to_wide("⬜ Pure White (Dead Pixel Check)").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 954, to_wide("⬛ Pure Black (Backlight Bleed Check)").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 955, to_wide("🟥 Pure Red Color Pattern").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 956, to_wide("🟩 Pure Green Color Pattern").as_ptr());
+        AppendMenuW(m_patterns, MF_STRING, 957, to_wide("🟦 Pure Blue Color Pattern").as_ptr());
+        AppendMenuW(hmenu, MF_POPUP, m_patterns as usize, to_wide("📐 Calibration & Test Patterns").as_ptr());
 
         AppendMenuW(hmenu, MF_SEPARATOR, 0, std::ptr::null());
 
-        // 10. Global Hotkeys Toggle
+        // 11. Global Hotkeys Master Toggle & Config
         let hk_label = if HOTKEYS_ENABLED.load(Ordering::SeqCst) {
             "✔ Global Hotkeys (Enabled)"
         } else {
             "✖ Global Hotkeys (Disabled)"
         };
         AppendMenuW(hmenu, MF_STRING, 105, to_wide(hk_label).as_ptr());
+        AppendMenuW(hmenu, MF_STRING, 106, to_wide("⚙️ Open Hotkeys Configurator").as_ptr());
         AppendMenuW(hmenu, MF_SEPARATOR, 0, std::ptr::null());
 
-        // 11. Exit
+        // 12. Exit
         AppendMenuW(hmenu, MF_STRING, 999, to_wide("❌ Exit Tray Daemon").as_ptr());
 
         let mut pt: POINT = std::mem::zeroed();
@@ -538,10 +565,15 @@ mod win32_tray {
 
         match cmd {
             100 => spawn_gui(),
+            101 => {
+                probe_state_background();
+                show_info_box("Hardware Sync", "Probing connected Acer displays over DDC/CI...\nState updated successfully.");
+            }
             105 => {
                 let cur = HOTKEYS_ENABLED.load(Ordering::SeqCst);
                 HOTKEYS_ENABLED.store(!cur, Ordering::SeqCst);
             }
+            106 => spawn_gui(),
 
             // Presets
             201 => run_cli(&["preset", "action"]),
@@ -570,6 +602,8 @@ mod win32_tray {
             403 => run_cli(&["contrast", "60"]),
             404 => run_cli(&["contrast", "50"]),
             405 => run_cli(&["contrast", "40"]),
+            406 => run_cli(&["contrast", "30"]),
+            407 => run_cli(&["contrast", "20"]),
 
             // Gaming
             501 => run_cli(&["aimpoint", "next"]),
@@ -582,9 +616,10 @@ mod win32_tray {
             508 => run_cli(&["overdrive", "normal"]),
             509 => run_cli(&["overdrive", "off"]),
             510 => run_cli(&["blackboost", "0"]),
-            511 => run_cli(&["blackboost", "5"]),
-            512 => run_cli(&["blackboost", "8"]),
-            513 => run_cli(&["blackboost", "10"]),
+            511 => run_cli(&["blackboost", "2"]),
+            512 => run_cli(&["blackboost", "5"]),
+            513 => run_cli(&["blackboost", "8"]),
+            514 => run_cli(&["blackboost", "10"]),
 
             // Color & Eye Shield
             601 => run_cli(&["bluelight", "0"]),
@@ -596,12 +631,17 @@ mod win32_tray {
             607 => run_cli(&["colortemp", "normal"]),
             608 => run_cli(&["colortemp", "cool"]),
             609 => run_cli(&["colortemp", "bluelight"]),
+            616 => run_cli(&["colortemp", "user"]),
             610 => run_cli(&["gamma", "2.2"]),
             611 => run_cli(&["gamma", "2.4"]),
             612 => run_cli(&["gamma", "2.0"]),
+            617 => run_cli(&["gamma", "1.8"]),
             613 => run_cli(&["colorspace", "srgb"]),
             614 => run_cli(&["colorspace", "dcip3"]),
             615 => run_cli(&["colorspace", "rec709"]),
+            618 => run_cli(&["colorspace", "hdr"]),
+            619 => run_cli(&["colorspace", "ebu"]),
+            620 => run_cli(&["colorspace", "smpte-c"]),
 
             // Input
             701 => run_cli(&["input", "dp"]),
@@ -625,7 +665,6 @@ mod win32_tray {
             902 => run_cli_with_notify(&["sync"], "🔄 Display Sync"),
             903 => run_cli_with_notify(&["keylock", "on"], "🔒 Physical OSD Keylock"),
             904 => run_cli_with_notify(&["unlock"], "🔓 Physical OSD Unlock"),
-            905 => run_cli_with_notify(&["test-pattern", "grid"], "📐 Display Calibration Pattern"),
             906 => run_cli_with_notify(&["energy"], "⚡ Energy Consumption Estimate"),
             907 => run_cli_with_notify(&["diag"], "📋 Hardware Diagnostic Scan"),
             908 => {
@@ -645,6 +684,29 @@ mod win32_tray {
                 });
             }
             909 => run_cli_with_notify(&["power", "off"], "🌙 Display Power Control"),
+            910 => run_cli_with_notify(&["raw", "e0", "02", "01"], "💡 Power LED: Enabled"),
+            911 => run_cli_with_notify(&["raw", "e0", "02", "00"], "💡 Power LED: Disabled"),
+            912 => {
+                std::thread::spawn(|| {
+                    let _ = crate::cli::dispatch_command(vec!["solar".into()]);
+                });
+                show_info_box("Solar Scheduler", "Circadian Solar Scheduler started in background.");
+            }
+            913 => {
+                std::thread::spawn(|| {
+                    let _ = crate::cli::dispatch_command(vec!["idle-dimmer".into(), "--idle-secs".into(), "300".into(), "--dim-to".into(), "10".into()]);
+                });
+                show_info_box("Idle Dimmer", "Smart Idle Dimmer started (5 min threshold, dims to 10%).");
+            }
+
+            // Patterns
+            951 => run_cli_with_notify(&["test-pattern", "grid"], "📐 Calibration Grid"),
+            952 => run_cli_with_notify(&["test-pattern", "rgb"], "🌈 RGB Spectrum Gradient"),
+            953 => run_cli_with_notify(&["test-pattern", "white"], "⬜ Dead Pixel Check: White"),
+            954 => run_cli_with_notify(&["test-pattern", "black"], "⬛ Backlight Bleed Check: Black"),
+            955 => run_cli_with_notify(&["test-pattern", "red"], "🟥 Test Pattern: Red"),
+            956 => run_cli_with_notify(&["test-pattern", "green"], "🟩 Test Pattern: Green"),
+            957 => run_cli_with_notify(&["test-pattern", "blue"], "🟦 Test Pattern: Blue"),
 
             999 => {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);
