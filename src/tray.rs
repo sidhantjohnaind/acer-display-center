@@ -212,64 +212,88 @@ mod win32_tray {
 
     static CURRENT_STATE: std::sync::Mutex<Option<TrayMonitorState>> = std::sync::Mutex::new(None);
 
-    fn probe_state_background() {
-        std::thread::spawn(|| {
-            let mut st = TrayMonitorState::default();
-            if let Ok(mut set) = crate::monitor::MonitorSet::enumerate() {
-                if let Some(mon) = set.monitors_mut().first_mut() {
-                    if let Ok((b, _)) = mon.get_vcp(0x10) { st.brightness = b; }
-                    if let Ok((c, _)) = mon.get_vcp(0x12) { st.contrast = c; }
-                    if let Ok((v, _)) = mon.get_vcp(0x62) { st.volume = v; }
-                    if let Ok((m, _)) = mon.get_vcp(0x8D) { st.is_muted = m == 1; }
-                    if let Ok((dm, _)) = mon.get_vcp(0xE2) {
-                        st.preset = match dm {
-                            0 => "User",
-                            1 => "Standard",
-                            2 => "ECO",
-                            3 => "Graphics",
-                            4 => "Movie",
-                            5 => "Action",
-                            6 => "Racing",
-                            7 => "Sports",
-                            11 => "HDR",
-                            _ => "Standard",
-                        }.to_string();
-                    }
-                    if let Ok((inp, _)) = mon.get_vcp(0x60) {
-                        st.input = match inp {
-                            0x0F => "DP",
-                            0x11 => "HDMI 1",
-                            0x12 => "HDMI 2",
-                            _ => "AUTO",
-                        }.to_string();
-                    }
-                    if let Ok((od, _)) = crate::acer::get_overdrive(mon).or_else(|_| mon.get_vcp(0x92)) {
-                        st.overdrive = match od {
-                            0 => "Off",
-                            1 => "Normal",
-                            2 => "Extreme",
-                            _ => "Off",
-                        }.to_string();
-                    }
-                    if let Ok((aim, _)) = crate::acer::get_aim_type(mon) {
-                        st.aimpoint = aim;
-                    }
-                    if let Ok((bl, _)) = crate::acer::get_blue_light(mon) {
-                        st.bluelight = bl;
-                    }
-                    if let Ok((ct, _)) = crate::acer::get_color_temp(mon) {
-                        st.colortemp = match ct {
-                            0 => "Cool",
-                            1 => "Normal",
-                            2 => "Warm",
-                            3 => "BlueLight",
-                            4 => "User",
-                            _ => "Normal",
-                        }.to_string();
-                    }
+    fn probe_state_sync() -> TrayMonitorState {
+        let mut st = TrayMonitorState::default();
+        if let Ok(mut set) = crate::monitor::MonitorSet::enumerate() {
+            if let Some(mon) = set.monitors_mut().first_mut() {
+                if let Ok((b, _)) = mon.get_vcp(0x10) { st.brightness = b; }
+                if let Ok((c, _)) = mon.get_vcp(0x12) { st.contrast = c; }
+                if let Ok((v, _)) = mon.get_vcp(0x62) { st.volume = v; }
+                if let Ok((m, _)) = mon.get_vcp(0x8D) { st.is_muted = m == 1; }
+                if let Ok((dm, _)) = mon.get_vcp(0xE2) {
+                    st.preset = match dm {
+                        0 => "User",
+                        1 => "Standard",
+                        2 => "ECO",
+                        3 => "Graphics",
+                        4 => "Movie",
+                        5 => "Action",
+                        6 => "Racing",
+                        7 => "Sports",
+                        11 => "HDR",
+                        _ => "User",
+                    }.to_string();
+                }
+                if let Ok((inp, _)) = mon.get_vcp(0x60) {
+                    st.input = match inp {
+                        0x0F => "DP",
+                        0x11 => "HDMI 1",
+                        0x12 => "HDMI 2",
+                        _ => "AUTO",
+                    }.to_string();
+                }
+                if let Ok((od, _)) = crate::acer::get_overdrive(mon).or_else(|_| mon.get_vcp(0x92)) {
+                    st.overdrive = match od {
+                        0 => "Off",
+                        1 => "Normal",
+                        2 => "Extreme",
+                        _ => "Off",
+                    }.to_string();
+                }
+                if let Ok((aim, _)) = crate::acer::get_aim_type(mon) {
+                    st.aimpoint = aim;
+                }
+                if let Ok((bl, _)) = crate::acer::get_blue_light(mon) {
+                    st.bluelight = bl;
+                }
+                if let Ok((ct, _)) = crate::acer::get_color_temp(mon) {
+                    st.colortemp = match ct {
+                        0 => "Cool",
+                        1 => "Normal",
+                        2 => "Warm",
+                        3 => "BlueLight",
+                        4 => "User",
+                        _ => "Normal",
+                    }.to_string();
+                }
+                if let Ok((gm, _)) = crate::acer::get_gamma(mon) {
+                    st.gamma = match gm {
+                        0 => "1.8",
+                        1 => "2.2",
+                        2 => "2.4",
+                        _ => "2.2",
+                    }.to_string();
+                }
+                if let Ok((cs, _)) = crate::acer::get_color_space(mon) {
+                    st.colorspace = match cs {
+                        0 => "sRGB",
+                        1 => "Rec.709",
+                        2 => "HDR",
+                        3 => "EBU",
+                        4 => "DCI",
+                        5 => "SMPTE-C",
+                        _ => "sRGB",
+                    }.to_string();
                 }
             }
-            st.hdr = crate::hdr::get_os_hdr();
+        }
+        st.hdr = crate::hdr::get_os_hdr();
+        st
+    }
+
+    fn probe_state_background() {
+        std::thread::spawn(|| {
+            let st = probe_state_sync();
             if let Ok(mut guard) = CURRENT_STATE.lock() {
                 *guard = Some(st);
             }
@@ -283,10 +307,17 @@ mod win32_tray {
         }
 
         let st = if let Ok(guard) = CURRENT_STATE.lock() {
-            guard.clone().unwrap_or_default()
+            if let Some(s) = guard.clone() {
+                s
+            } else {
+                probe_state_sync()
+            }
         } else {
-            TrayMonitorState::default()
+            probe_state_sync()
         };
+        if let Ok(mut guard) = CURRENT_STATE.lock() {
+            *guard = Some(st.clone());
+        }
 
         let p_label = |name: &str, cur_name: &str, title: &str| -> String {
             if cur_name.eq_ignore_ascii_case(name) {
@@ -746,6 +777,22 @@ mod win32_tray {
                 let _ = RegisterHotKey(hwnd, id, mods, vk);
                 println!("   [{}] {:<22} -> {}", binding.to_display_string(), binding.name, binding.description);
             }
+
+            println!("● Starting background live hardware state sync thread...");
+            probe_state_background();
+
+            std::thread::spawn(|| {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    if EXIT_REQUESTED.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let fresh = probe_state_sync();
+                    if let Ok(mut guard) = CURRENT_STATE.lock() {
+                        *guard = Some(fresh);
+                    }
+                }
+            });
 
             HOOK_HANDLE = windows_sys::Win32::UI::WindowsAndMessaging::SetWindowsHookExW(
                 13, // WH_KEYBOARD_LL

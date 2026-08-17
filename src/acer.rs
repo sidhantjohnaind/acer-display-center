@@ -175,6 +175,10 @@ pub fn get_black_boost(mon: &mut Monitor) -> Result<(u32, u32), String> {
     mon.get_vcp(0xE5)
 }
 
+pub fn get_color_space(mon: &mut Monitor) -> Result<(u32, u32), String> {
+    get_raw_bank(mon, 0xE9, 0x00)
+}
+
 pub fn fade_vcp(mon: &mut Monitor, code: u8, start_val: u32, end_val: u32, duration_ms: u64) -> Result<(), String> {
     let steps = 20u64.min(duration_ms.max(1));
     let step_delay = std::time::Duration::from_millis(duration_ms / steps);
