@@ -1,24 +1,40 @@
-# Acer Monitor Control CLI & Daemon Suite (`amctl`) 🖥️⚡
+# Acer Display Center & Monitor CLI Suite (`amctl`) 🖥️⚡
 
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%2011%2F10%20%7C%20Linux-blue.svg)]()
 [![Arch](https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64%20%7C%20RISC--V%2064-purple.svg)]()
 
-> A feature-rich, high-performance Rust CLI (`amctl` / `acer_monitor_cli`), IPC daemon, and system integration suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Linux (x86_64, ARM64, RISC-V 64) and Windows (x86_64, ARM64).
+> A high-performance, pure Rust GUI & CLI suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Windows (AMD64 & ARM64) and Linux (x86_64, ARM64, RISC-V 64). Includes the **Acer Display Center GUI Flyout**, **Native System Tray Daemon**, **Global Hotkeys Customizer**, **Sub-Millisecond IPC Engine**, and **Automated Hardware Watchers**.
+
+---
+
+## ⚡ 1-Click Instant Install
+
+### 🪟 Windows (1-Click PowerShell)
+Open PowerShell and run:
+```powershell
+irm https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.ps1 | iex
+```
+*Installs `amctl.exe` to `%LocalAppData%\Programs\acer_monitor_cli`, adds to PATH, creates Start Menu shortcut, registers Windows Startup auto-start, and immediately launches the background System Tray daemon.*
+
+### 🐧 Linux (1-Click Shell)
+Open your terminal and run:
+```bash
+curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.sh | bash
+```
 
 ---
 
 ## 📋 Table of Contents
 
 - [✨ Key Features](#-key-features)
-- [📊 Performance & Resource Benchmarks](#-performance--resource-benchmarks)
-
-- [📦 Installation](#-installation)
-  - [Linux Quick Install](#linux-quick-install)
+- [🖥️ Acer Display Center GUI & System Tray Daemon](#️-acer-display-center-gui--system-tray-daemon)
+- [📦 Installation & Releases](#-installation--releases)
+  - [1-Click Web Install](#-1-click-instant-install)
+  - [Windows Manual Install](#-windows-install)
+  - [Linux AppImage & Source Install](#-linux-install)
   - [Ubuntu / GNOME Top Bar Extension](#ubuntu--gnome-top-bar-extension)
-  - [Windows Quick Install & Taskbar System Tray Widget](#windows-quick-install--taskbar-system-tray-widget)
-  - [Building from Source & Architecture Targets](#building-from-source--architecture-targets)
 - [🛠️ Usage & Command Reference](#️-usage--command-reference)
   - [Display & Audio Basics](#display--audio-basics)
   - [Hardware Presets & Acer Banked VCP Controls](#hardware-presets--acer-banked-vcp-controls)
@@ -26,9 +42,6 @@
   - [Query, Information & Diagnostics](#query-information--diagnostics)
   - [Multi-Monitor Management](#multi-monitor-management)
   - [Automation & Background Daemons](#automation--background-daemons)
-  - [Profile Management](#profile-management)
-  - [Shell & Status Bar Integration](#shell--status-bar-integration)
-- [⚡ Advanced: Raw Banked VCP Control](#-advanced-raw-banked-vcp-control)
 - [⌨️ Keyboard Shortcuts & Global Hotkey Binding](#️-keyboard-shortcuts--global-hotkey-binding)
 - [📄 License](#-license)
 
@@ -36,43 +49,62 @@
 
 ## ✨ Key Features
 
+* **🎨 Acer Display Center GUI Flyout**: Pure Rust dark studio Quick Settings flyout (<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>) with live hardware sliders, visual preset cards, eye shield toggles, and dedicated `[ 📌 Pin ]` window control.
+* **🪟 Native Windows System Tray Daemon (`amctl tray`)**:
+  - Low-level Win32 keyboard hook (`WH_KEYBOARD_LL`) with asynchronous DDC/CI hardware bus dispatch.
+  - Cascading right-click menu with **live real-time state indicators** (`(Current: 75%)`, `● (Current)`).
+  - Modern **Dark Studio Report Viewer modal** with monospace syntax formatting, screen centering, and one-click `[ 📋 Copy to Clipboard ]` button.
+* **⚙️ Built-In Global Hotkeys Customizer**: Edit, add, or customize system-wide key combinations with instant JSON persistence.
 * **🖥️ Full Display & Audio Control**: Adjust Brightness, Contrast, Volume, Mute, Power, and Input source (`DP`, `HDMI1`, `HDMI2`, `Auto`, `Next`).
 * **🎮 Acer Hardware Banked VCPs**: Direct hardware access to Black Boost, OverDrive (`od`), AimPoint Crosshair (`aim`), Blue Light Filter (`bluelight`), Gamma, Color Temperature (`colortemp`), and Refresh Rate Counter (`refreshnum`).
 * **🎛️ One-Touch Hardware Presets**: Apply native monitor OSD modes (`user`, `standard`, `eco`, `graphics`, `action`, `racing`, `sports`, `hdr`, `reading`, `movie`).
+* **✨ Unified HDR Bridge**: Seamlessly synchronizes Windows 11 OS HDR with Monitor Hardware HDR in a single switch.
 * **🌊 Smooth Parameter Fading**: Transition brightness, contrast, or volume smoothly over custom time durations (`fade`).
 * **☀️ Solar Circadian Auto-Scheduler**: Automatically shifts display brightness and color temperature between day and night based on GPS coordinates.
-* **🌙 Smart Inactivity Idle Dimmer**: Dims screen after inactivity, with **automatic inhibition during media playback** via MPRIS D-Bus checks.
+* **🌙 Smart Inactivity Idle Dimmer**: Dims screen after inactivity, with automatic inhibition during media playback.
 * **⚡ Sub-Millisecond IPC Socket Server**: Background server daemon (`server`) listening on local IPC for instant hotkey handling (`send`).
-* **🎮 Auto-Profile Switcher**: Automatically applies monitor profile JSONs when specified applications/games launch (`auto-profile`).
-* **👀 Hotplug Monitor Watcher**: Monitors connected displays for live hotplug events (`watch-monitors`).
-* **📊 Hardware EDID & VCP Inspector**: Decodes EDID (resolution, screen size, manufacture date, serial numbers) and probes active VCP feature codes with optional `--json` export.
-* **💡 Real-Time Energy Calculator**: Calculates live wattage draw (~15.2W) and estimated annual electricity costs (~$6.68/year).
-* **🎨 Diagnostic Test Patterns**: Renders full-screen RGB, alignment grids, and grayscale gradients for display testing.
-* **⚙️ Multi-Monitor Support**: Target specific displays by index (`0`), model substring (`VG271U`), or all connected displays (`all`). Includes `sync` and brightness `balance`.
-* **🧩 Desktop Integrations**:
-  - **Linux GNOME Shell Extension**: Top bar Quick Settings widget (`acer-monitor@sidhant`) with sliders & submenus.
-  - **Windows Taskbar System Tray Widget**: Native Windows Notification Area app (`acer-tray.ps1`).
-  - **Shell & Status Bar**: Systemd User Service, Desktop Launcher, Waybar JSON config, and shell completion scripts (`bash`, `zsh`, `fish`).
 * **🌍 Multi-Architecture Support**: Native cross-compilation binaries for **x86_64**, **ARM64 (aarch64)**, and **RISC-V 64 (riscv64gc)**.
 
 ---
 
-## 📊 Performance & Resource Benchmarks
+## 🖥️ Acer Display Center GUI & System Tray Daemon
 
-| Metric | ⚡ **`amctl` (Rust Binary)** | 🪟 **`acer-tray.ps1` (Win Tray)** | 🐍 **Python / PyQt Tools** | 🌐 **Electron GUI Apps** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Idle RAM Usage** | **~1.2 MB** | **~14 MB** | ~45 – 70 MB | ~180 – 350 MB |
-| **CLI Execution RAM** | **~0.8 MB** (instant exit) | N/A | ~25 MB | ~120 MB |
-| **CPU Usage (Idle)** | **0.00%** | **0.00%** | 0.05% – 0.2% | 0.1% – 1.5% |
-| **CPU Usage (Command)**| **< 0.01%** | **< 0.05%** | ~2% – 5% | ~8% – 15% |
-| **Executable Size** | **~660 KB** | **~7 KB** | ~35 MB (PyInstaller) | ~120 MB |
-| **Startup / Launch Time**| **< 2 ms** | **~150 ms** | ~400 ms | ~1.8 – 3.0 s |
-| **IPC Latency (`send`)** | **< 0.5 ms** | N/A | ~15 ms | ~50 ms |
+### 1. Quick Access GUI Flyout (`amctl gui`)
+Press **<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>** or left-click the System Tray icon to open the flyout:
+- **Header Controls**: `[ 📌 Pin Window ]`, `[ 🎨 Dark/Light Theme ]`, and `[ 🔄 Re-sync ]`.
+- **Top Quick Action Cards**: ECO Mode, Max Gaming, Reading Shield, Movie Cinema, and Standard.
+- **Hardware Sliders**: Smooth Brightness and Contrast adjustments with on-screen OSD feedback.
+- **Gaming & Esports**: OverDrive (`Extreme` / `Normal` / `Off`), AimPoint Crosshair (`Dot` / `Cross 1` / `Cross 2`), Refresh Rate HUD.
+- **Color & Eye Shield**: Blue Light Filter (Level 1–4), Color Temperature (Warm / Normal / Cool / BlueLight), Gamma (2.0 / 2.2 / 2.4), Color Space (sRGB / DCI-P3 / Rec.709).
+- **Hardware & Power Tools**: Unified HDR Master Switch, Physical Keylock, Energy Estimator, Diagnostic Scanner, Calibration Grid, Factory Reset.
+- **Hotkeys Customizer**: Add and rebind any hotkey directly inside the UI.
+
+### 2. Live System Tray Context Menu (`amctl tray`)
+Right-click the notification area icon for instant cascading controls showing current live state:
+- `🎮 Picture Presets (Current: Action)`
+- `☀️ Brightness (Current: 75%)`
+- `🌓 Contrast (Current: 50%)`
+- `🎯 Gaming & Esports (Off, Aim: Off)`
+- `🎨 Color & Eye Shield (Warm)`
+- `🔌 Input Source (Current: DP)`
+- `🔊 Audio (Current: 50%)`
+- `🛠️ Hardware Tools & Power` (Centered Dark Studio modals with `[ 📋 Copy ]` button)
+- `⚙️ Global Hotkeys (Toggle Enable/Disable)`
 
 ---
 
+## 📦 Installation & Releases
 
-## 📦 Installation & Standalone Packages
+### 🪟 Windows Install
+Run the 1-click install command or download the latest `.exe` from [Releases](https://github.com/sidhantjohnaind/acer-display-center/releases):
+```powershell
+irm https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.ps1 | iex
+```
+
+### 🐧 Linux Install
+```bash
+curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.sh | bash
+```
 
 ### 🐧 Linux AppImage (Portable)
 Download and run the standalone **AppImage** on any Linux distribution without compiling:
@@ -81,51 +113,14 @@ chmod +x amctl-x86_64.AppImage
 ./amctl-x86_64.AppImage info
 ```
 
-### 🐧 Linux Source Install
-Make sure your user is in the `i2c` group and `i2c-dev` kernel module is enabled (`sudo modprobe i2c-dev`).
-
-Run the automated installation script:
-```bash
-chmod +x install.sh
-./install.sh
-```
-
-### 🪟 Windows Standalone (`.exe` Binary)
-Download and run `acer_monitor_cli.exe` directly from the `dist/` directory, or build via PowerShell:
-```powershell
-cargo build --release --target x86_64-pc-windows-gnu
-```
-
-To enable the systemd background service (Linux):
-```bash
-
-systemctl --user enable --now acer-monitor
-```
-
-### Ubuntu / GNOME Top Bar Extension
-
-To add an interactive Acer Monitor Control icon to your GNOME Shell top bar:
-```bash
-chmod +x install-gnome-extension.sh
-./install-gnome-extension.sh
-```
-
-### Windows Quick Install & Taskbar System Tray Widget
-
-Run PowerShell as User or Administrator, or launch `install.bat`:
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-.\install.ps1
-```
-
 This performs the complete Windows setup:
-1. Installs `acer_monitor_cli.exe` into `%LocalAppData%\Programs\acer_monitor_cli` and adds it to your user `PATH`.
-2. Installs and auto-starts the **Windows System Tray Widget** (`acer-tray.ps1`) in the Windows Taskbar Notification Area (next to the clock).
-3. Registers a Start Menu shortcut and Task Scheduler logon trigger for the Smart Idle Dimmer.
+1. Installs `amctl.exe` & `acer_monitor_cli.exe` into `%LocalAppData%\Programs\acer_monitor_cli` and adds it to your user `PATH`.
+2. Creates an **Acer Display Center** Start Menu shortcut with the custom app icon (`app.ico`).
+3. Auto-registers and starts the **Pure Rust System Tray Daemon** (`amctl tray`) on Windows logon.
 
-To launch or restart the Windows System Tray Widget manually at any time:
+To launch or restart the System Tray Daemon manually:
 ```powershell
-powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "$env:LocalAppData\Programs\acer_monitor_cli\acer-tray.ps1"
+amctl tray
 ```
 
 ### 🗑️ Uninstallation
