@@ -80,7 +80,7 @@ Write-Host "[+] Created Start Menu Shortcut: Acer Display Center" -ForegroundCol
 
 # Register Startup Daemon (amctl tray)
 $StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
-$StartupShortcut = $WshShell.CreateShortcut((Join-Path $StartupDir "Acer Display Center Tray.lnk"))
+$StartupShortcut = $WshShell.CreateShortcut((Join-Path $StartupDir "Acer Display Center.lnk"))
 $StartupShortcut.TargetPath = $ExeTarget
 $StartupShortcut.Arguments = "tray"
 $StartupShortcut.WorkingDirectory = $InstallDir
@@ -88,6 +88,10 @@ $StartupShortcut.Description = "Acer Display Center Background System Tray Daemo
 if (Test-Path $IcoTarget) { $StartupShortcut.IconLocation = "$IcoTarget,0" }
 $StartupShortcut.Save()
 Write-Host "[+] Registered System Tray background daemon at Windows Startup." -ForegroundColor Green
+
+# Also configure Windows Run Registry Key for reliability
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -Value "`"$ExeTarget`" tray" -Force
+Write-Host "[+] Registered Windows Run registry startup entry." -ForegroundColor Green
 
 # Launch Tray Daemon Now
 Start-Process -FilePath $ExeTarget -ArgumentList "tray" -WindowStyle Hidden
