@@ -28,30 +28,56 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "preset" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli preset <user|standard|eco|graphics|hdr|action|racing|sports|reading|movie|0-11> [specifier]".to_string());
+                return Err("Usage: acer_monitor_cli preset <user|standard|eco|graphics|hdr|action|racing|sports|reading|movie|0-11> [specifier] [--unified]".to_string());
             }
             let preset_name = args[0].to_ascii_lowercase();
-            let spec = parse_optional_specifier(&args[1..]);
+            let is_unified = args.iter().any(|a| a == "--unified" || a == "-u");
+            let filtered: Vec<String> = args[1..].iter().filter(|a| *a != "--unified" && *a != "-u").cloned().collect();
+            let spec = parse_optional_specifier(&filtered);
+
+            let val: u32 = match preset_name.as_str() {
+                "user" => 0,
+                "standard" | "normal" => 1,
+                "eco" => 2,
+                "graphics" => 3,
+                "action" | "gaming" => 5,
+                "racing" => 6,
+                "sports" => 7,
+                "hdr" | "hdr400" => 11,
+                "reading" | "text" => 2,
+                "movie" | "cinema" => 3,
+                other => parse_u32(other)?,
+            };
 
             with_monitor(spec, |mon| {
-                match preset_name.as_str() {
-                    "user" => acer::display_mode(mon, 0),
-                    "standard" | "normal" => acer::display_mode(mon, 1),
-                    "eco" => acer::display_mode(mon, 2),
-                    "graphics" => acer::display_mode(mon, 3),
-                    "action" | "gaming" => acer::display_mode(mon, 5),
-                    "racing" => acer::display_mode(mon, 6),
-                    "sports" => acer::display_mode(mon, 7),
-                    "hdr" | "hdr400" => acer::display_mode(mon, 11),
-                    "reading" | "text" => mon.set_vcp(0xDC, 0x02),
-                    "movie" | "cinema" => mon.set_vcp(0xDC, 0x03),
-                    other => {
-                        let val = parse_u32(other)?;
-                        acer::display_mode(mon, val)
-                    }
-                }
+                // 1. Direct hardware Display Mode register (Acer 0xE2)
+                mon.set_vcp(0xE2, val)?;
+                // 2. Also send VESA MCCS 0x14 (Color Preset) & 0xDC (Display Application)
+                let _ = mon.set_vcp(0x14, val.min(5));
+                let _ = mon.set_vcp(0xDC, val);
+                Ok(())
             })?;
-            Ok(format!("Applied hardware preset '{preset_name}'."))
+
+            // Only synchronize Windows OS HDR if Unified bridge mode is explicitly active
+            if is_unified {
+                if val == 11 || preset_name == "hdr" || preset_name == "hdr400" {
+                    crate::hdr::set_os_hdr(true);
+                } else if crate::hdr::get_os_hdr() {
+                    crate::hdr::set_os_hdr(false);
+                }
+            }
+
+            Ok(format!("Applied hardware preset '{preset_name}' (VCP 0xE2 = {val})."))
+        }
+
+        "hotkeys" => {
+            if args.is_empty() {
+                let state = crate::tray::are_hotkeys_enabled();
+                return Ok(format!("Global hotkeys are {}.", if state { "ENABLED" } else { "DISABLED" }));
+            }
+            let on = parse_on_off(&args[0])?;
+            crate::tray::set_hotkeys_enabled(on);
+            Ok(format!("Global hotkeys set to {}.", if on { "ENABLED" } else { "DISABLED" }))
         }
 
         "unlock" => {
@@ -139,6 +165,20 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok(pattern::render_pattern(name))
         }
 
+        "report" => {
+            let title = if !args.is_empty() { args.remove(0) } else { "Acer Monitor Report".into() };
+            let content = args.join(" ");
+            crate::gui::run_report_gui(title, content)?;
+            Ok(String::new())
+        }
+
+        "tray" => {
+            crate::tray::run_tray()?;
+            Ok(String::new())
+        }
+
+        "watch-vcp" | "watch" => run_watch_vcp(args),
+
         "watch-monitors" => {
             println!("Hotplug Monitor Watcher running... Press Ctrl+C to stop.");
             let mut last_count = 0;
@@ -212,9 +252,9 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             let target_sub = args.first().map(|s| s.as_str()).unwrap_or("both");
             
             let (mode, action) = match target_sub {
-                "os" => ("os", args.get(1).map(|s| s.as_str()).unwrap_or("on")),
-                "monitor" | "display" | "hardware" => ("monitor", args.get(1).map(|s| s.as_str()).unwrap_or("on")),
-                "both" => ("both", "on"),
+                "os" => ("os", args.get(1).map(|s| s.as_str()).unwrap_or("toggle")),
+                "monitor" | "display" | "hardware" => ("monitor", args.get(1).map(|s| s.as_str()).unwrap_or("toggle")),
+                "both" => ("both", args.get(1).map(|s| s.as_str()).unwrap_or("toggle")),
                 act => ("both", act),
             };
 
@@ -489,8 +529,11 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             }
             let on = parse_on_off(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
-            with_monitor(spec, |mon| acer::key_lock(mon, on))?;
-            Ok("OK".to_string())
+            with_monitor(spec, |mon| {
+                acer::key_lock(mon, on)?;
+                Ok(())
+            })?;
+            Ok(if on { "OSD keys locked.".to_string() } else { "OSD keys unlocked.".to_string() })
         }
 
         "powerkey" => {
@@ -868,6 +911,18 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                     Ok(format!("Loaded profile from '{path}'"))
                 }
                 _ => Err(format!("Unknown profile action '{action}'. Use 'save' or 'load'.")),
+            }
+        }
+
+        "gui" | "flyout" => {
+            #[cfg(windows)]
+            {
+                crate::gui::run_gui()?;
+                Ok("GUI closed.".to_string())
+            }
+            #[cfg(not(windows))]
+            {
+                Err("GUI is currently supported on Windows.".to_string())
             }
         }
 
@@ -1329,6 +1384,258 @@ fn parse_bank(s: &str) -> Result<u8, String> {
     }
 }
 
+pub fn vcp_name(code: u8) -> &'static str {
+    match code {
+        0x04 => "Restore Factory Defaults",
+        0x05 => "Restore Factory Brightness/Contrast",
+        0x06 => "Restore Factory Geometry",
+        0x08 => "Restore Factory Color Defaults",
+        0x0A => "Restore Factory TV Defaults",
+        0x0B => "Color Temperature Increment",
+        0x0C => "Color Temperature Request",
+        0x0E => "Clock",
+        0x10 => "Brightness (Luminance)",
+        0x12 => "Contrast",
+        0x14 => "Select Color Preset",
+        0x16 => "Red Video Gain",
+        0x18 => "Green Video Gain",
+        0x1A => "Blue Video Gain",
+        0x1C => "Focus",
+        0x1E => "Auto Setup",
+        0x20 => "Horizontal Position",
+        0x22 => "Horizontal Size",
+        0x24 => "Horizontal Pincushion",
+        0x26 => "Horizontal Pincushion Balance",
+        0x28 => "Horizontal Convergence R/B",
+        0x2A => "Horizontal Convergence M/G",
+        0x2C => "Horizontal Linearity",
+        0x2E => "Horizontal Linearity Balance",
+        0x30 => "Vertical Position",
+        0x32 => "Vertical Size",
+        0x34 => "Vertical Pincushion",
+        0x36 => "Vertical Pincushion Balance",
+        0x38 => "Vertical Convergence R/B",
+        0x3A => "Vertical Convergence M/G",
+        0x3C => "Vertical Linearity",
+        0x3E => "Vertical Linearity Balance",
+        0x40 => "Parallelogram Distortion",
+        0x42 => "Trapezoid Distortion",
+        0x44 => "Tilt (Rotation)",
+        0x46 => "Top Corner Flare",
+        0x48 => "Top Corner Hook",
+        0x4A => "Bottom Corner Flare",
+        0x4C => "Bottom Corner Hook",
+        0x52 => "Active Control",
+        0x54 => "Ambient Light Sensor",
+        0x56 => "Horizontal Moire",
+        0x58 => "Vertical Moire",
+        0x59 => "6-Axis Saturation (Red)",
+        0x5A => "6-Axis Saturation (Yellow)",
+        0x5B => "6-Axis Saturation (Green)",
+        0x5C => "6-Axis Saturation (Cyan)",
+        0x5D => "6-Axis Saturation (Blue)",
+        0x5E => "6-Axis Saturation (Magenta)",
+        0x5F => "6-Axis Hue Control",
+        0x60 => "Input Source / Select",
+        0x62 => "Audio Speaker Volume",
+        0x63 => "Speaker Select",
+        0x64 => "Audio Microphone Volume",
+        0x66 => "Ambient Light Sensor",
+        0x6C => "Black Level (Red)",
+        0x6E => "Black Level (Green)",
+        0x70 => "Black Level (Blue)",
+        0x72 => "Gamma",
+        0x7C => "Adjust Focal Plane",
+        0x86 => "Display Scaling / Aspect Ratio",
+        0x87 => "Sharpness",
+        0x8A => "Velocity Scan Modulation",
+        0x8D => "Audio Mute",
+        0x8E => "Window Swap",
+        0x8F => "Window Selection",
+        0x90 => "Window Control",
+        0x92 => "Window Background",
+        0x9B => "6-Axis Hue (Red)",
+        0x9C => "6-Axis Hue (Yellow)",
+        0x9D => "6-Axis Hue (Green)",
+        0x9E => "6-Axis Hue (Cyan)",
+        0x9F => "6-Axis Hue (Blue)",
+        0xA0 => "6-Axis Hue (Magenta)",
+        0xAA => "Screen Orientation",
+        0xAC => "Horizontal Frequency",
+        0xAE => "Vertical Frequency",
+        0xB0 => "Settings / Setup",
+        0xB2 => "Flat Panel Sub-Pixel Layout",
+        0xB6 => "Display Technology / HDR",
+        0xC0 => "Display Usage Time",
+        0xC6 => "Application Enable Key",
+        0xC8 => "Display Controller ID",
+        0xC9 => "Display Firmware Level",
+        0xCA => "OSD Language",
+        0xCC => "OSD / Power Indicator / User Controls",
+        0xD4 => "Stereo Video Mode",
+        0xD6 => "Power Mode / DPMS",
+        0xDC => "Display Mode / Preset",
+        0xDF => "VCP Version",
+        0xE0 => "Manufacturer / Bank Selector",
+        0xE1 => "Manufacturer / Bank Value",
+        0xE2 => "Manufacturer / Display Mode",
+        0xE5 => "Manufacturer / Black Boost",
+        0xE7 => "Manufacturer / Color Bank Selector",
+        0xE8 => "Manufacturer / Color Bank Value",
+        0xE9 => "Manufacturer / Calibration Bank Selector",
+        0xEA => "Manufacturer / Calibration Bank Value",
+        0xEB..=0xFF => "Manufacturer Specific",
+        _ => "Unknown VCP Feature",
+    }
+}
+
+fn current_time_str() -> String {
+    if let Ok(duration) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        let total_secs = duration.as_secs();
+        let secs = total_secs % 60;
+        let mins = (total_secs / 60) % 60;
+        let hours = (total_secs / 3600) % 24;
+        format!("{hours:02}:{mins:02}:{secs:02}")
+    } else {
+        "00:00:00".to_string()
+    }
+}
+
+fn run_watch_vcp(args: Vec<String>) -> Result<String, String> {
+    let mut is_all = false;
+    let mut is_json = false;
+    let mut poll_interval_ms: u64 = 500;
+    let mut explicit_codes = Vec::new();
+    let mut specifier: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--all" || arg == "-a" {
+            is_all = true;
+        } else if arg == "--json" || arg == "-j" {
+            is_json = true;
+        } else if let Some(val) = arg.strip_prefix("--interval=") {
+            poll_interval_ms = val.parse().map_err(|e| format!("Invalid interval '{val}': {e}"))?;
+        } else if (arg == "--interval" || arg == "-i") && i + 1 < args.len() {
+            poll_interval_ms = args[i + 1].parse().map_err(|e| format!("Invalid interval '{}': {e}", args[i + 1]))?;
+            i += 1;
+        } else if let Some(val) = arg.strip_prefix("--monitor=") {
+            specifier = Some(val.to_string());
+        } else if (arg == "--monitor" || arg == "-m") && i + 1 < args.len() {
+            specifier = Some(args[i + 1].clone());
+            i += 1;
+        } else if let Ok(code) = parse_u32(arg) {
+            if code <= 0xFF {
+                explicit_codes.push(code as u8);
+            } else {
+                return Err(format!("VCP code 0x{code:X} exceeds 0xFF"));
+            }
+        } else {
+            if specifier.is_none() {
+                specifier = Some(arg.clone());
+            }
+        }
+        i += 1;
+    }
+
+    let mut set = MonitorSet::enumerate()?;
+    let mon = set.pick_mut_by_specifier(specifier.as_deref())?;
+
+    let candidate_codes: Vec<u8> = if !explicit_codes.is_empty() {
+        explicit_codes
+    } else if is_all {
+        (0x00u8..=0xFFu8).collect()
+    } else {
+        let _ = mon.update_capabilities();
+        let mut codes_set = mon.capabilities.vcp_codes.clone();
+        for code in [
+            0x04u8, 0x06, 0x08, 0x0B, 0x0C, 0x0E, 0x10, 0x12, 0x14, 0x16, 0x18, 0x1A, 0x1E,
+            0x20, 0x30, 0x52, 0x54, 0x60, 0x62, 0x6C, 0x6E, 0x70, 0x72, 0x86, 0x87, 0x8D,
+            0x90, 0xAA, 0xAC, 0xAE, 0xB0, 0xB6, 0xC6, 0xC8, 0xC9, 0xCA, 0xCC, 0xD4, 0xD6,
+            0xDC, 0xDF, 0xE0, 0xE1, 0xE2, 0xE5, 0xE7, 0xE8, 0xE9, 0xEA,
+        ] {
+            codes_set.insert(code);
+        }
+        codes_set.into_iter().collect()
+    };
+
+    let mut active_codes: std::collections::BTreeMap<u8, (u32, u32)> = std::collections::BTreeMap::new();
+    for &code in &candidate_codes {
+        if let Ok((cur, max)) = mon.get_vcp(code) {
+            active_codes.insert(code, (cur, max));
+        }
+    }
+
+    if active_codes.is_empty() {
+        return Err(format!(
+            "No readable VCP codes found on '{}'. Ensure DDC/CI is enabled in the monitor's OSD menu.",
+            mon.description
+        ));
+    }
+
+    if is_json {
+        let items: Vec<String> = active_codes
+            .iter()
+            .map(|(&c, &(cur, max))| {
+                format!(
+                    "{{\"code\":\"0x{c:02X}\",\"name\":\"{}\",\"current\":{cur},\"max\":{max}}}",
+                    vcp_name(c)
+                )
+            })
+            .collect();
+        println!(
+            "{{\"event\":\"init\",\"monitor\":\"{}\",\"interval_ms\":{poll_interval_ms},\"active_codes\":[{}]}}",
+            mon.description.replace('"', "\\\""),
+            items.join(",")
+        );
+    } else {
+        println!("========================================================================");
+        println!("[amctl] Real-Time VCP Watcher - Monitoring '{}'", mon.description);
+        println!("========================================================================");
+        println!(
+            "Active readable VCP codes ({} detected, polling every {}ms):",
+            active_codes.len(),
+            poll_interval_ms
+        );
+        for (&code, &(cur, max)) in &active_codes {
+            let name = vcp_name(code);
+            println!("  0x{code:02X} ({name:<34}) current: {cur:<4} max: {max}");
+        }
+        println!("------------------------------------------------------------------------");
+        println!("Press buttons on your monitor / change OSD settings to detect changes.");
+        println!("Press Ctrl+C to stop.");
+        println!("------------------------------------------------------------------------");
+    }
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(poll_interval_ms));
+
+        let current_keys: Vec<u8> = active_codes.keys().copied().collect();
+        for code in current_keys {
+            let old_entry = active_codes.get(&code).copied();
+            if let Some((old_cur, old_max)) = old_entry {
+                if let Ok((new_cur, new_max)) = mon.get_vcp(code) {
+                    if new_cur != old_cur || new_max != old_max {
+                        let name = vcp_name(code);
+                        let timestamp = current_time_str();
+                        if is_json {
+                            println!(
+                                "{{\"event\":\"change\",\"timestamp\":\"{timestamp}\",\"code\":\"0x{code:02X}\",\"name\":\"{name}\",\"old\":{old_cur},\"new\":{new_cur},\"max\":{new_max}}}"
+                            );
+                        } else {
+                            println!(
+                                "[{timestamp}] VCP CHANGE: 0x{code:02X} ({name}) changed: {old_cur} -> {new_cur} (max: {new_max})"
+                            );
+                        }
+                        active_codes.insert(code, (new_cur, new_max));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn get_waybar_config_string() -> String {
     r#"{
   "custom/acer_monitor": {
@@ -1364,6 +1671,8 @@ _acer_monitor_cli() {
     'idle-dimmer:Smart Inactivity Idle Dimmer with Video Inhibit'
     'auto-profile:Auto-switch profiles based on running app/game'
     'energy:Estimate power consumption and electricity cost'
+    'tray:Run native System Tray notification area application'
+    'watch-vcp:Monitor real-time VCP code value changes'
     'watch-monitors:Monitor display hotplug events'
     'test-pattern:Display diagnostic test patterns'
     'blackboost:Adjust Black Boost'
@@ -1385,12 +1694,12 @@ _acer_monitor_cli() {
 }
 _acer_monitor_cli "$@""#.to_string(),
 
-        "fish" => r#"complete -c acer_monitor_cli -f -n "__fish_use_subcommand" -a "list caps get set brightness contrast volume fade preset unlock balance diag idle-dimmer auto-profile energy watch-monitors test-pattern blackboost mute input info scan profile solar-schedule install-service sync server send edid waybar-config completions"#.to_string(),
+        "fish" => r#"complete -c acer_monitor_cli -f -n "__fish_use_subcommand" -a "list caps get set brightness contrast volume fade preset unlock balance diag idle-dimmer auto-profile energy tray watch-vcp watch-monitors test-pattern blackboost mute input info scan profile solar-schedule install-service sync server send edid waybar-config completions"#.to_string(),
 
         _ => r#"# bash completion for acer_monitor_cli
 _acer_monitor_cli_completions() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local cmds="list caps get set brightness contrast volume fade preset unlock balance diag idle-dimmer auto-profile energy watch-monitors test-pattern blackboost mute input info scan profile solar-schedule install-service sync server send edid waybar-config completions power reset keylock powerkey indicator od aim refreshnum bluelight gamma colortemp displaymode colorspace rawbank getbank get-bluelight get-gamma get-colortemp get-od get-aim get-blackboost get-keylock get-indicator"
+  local cmds="list caps get set brightness contrast volume fade preset unlock balance diag idle-dimmer auto-profile energy tray watch-vcp watch-monitors test-pattern blackboost mute input info scan profile solar-schedule install-service sync server send edid waybar-config completions power reset keylock powerkey indicator od aim refreshnum bluelight gamma colortemp displaymode colorspace rawbank getbank get-bluelight get-gamma get-colortemp get-od get-aim get-blackboost get-keylock get-indicator"
   COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
 }
 complete -F _acer_monitor_cli_completions acer_monitor_cli"#.to_string(),
@@ -1416,6 +1725,9 @@ Usage:
   acer_monitor_cli idle-dimmer [--idle-secs 300] [--dim-to 10] [specifier]
   acer_monitor_cli auto-profile --rule "proc:profile.json"
   acer_monitor_cli energy [specifier]
+  acer_monitor_cli tray
+  acer_monitor_cli watch-vcp [--all] [--interval <ms>] [--json] [specifier]
+  acer_monitor_cli watch-vcp [vcp_code1 vcp_code2 ...] [--interval <ms>] [specifier]
   acer_monitor_cli watch-monitors
   acer_monitor_cli test-pattern <red|green|blue|white|black|grid|gradient>
   acer_monitor_cli blackboost <0-10> [specifier]

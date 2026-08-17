@@ -6,11 +6,14 @@ mod energy;
 mod hdr;
 mod idle;
 
+mod gui;
+mod hotkeys;
 mod monitor;
 mod osd;
 mod pattern;
 mod server;
 mod solar;
+mod tray;
 
 fn main() {
     if let Err(err) = cli::run() {

@@ -466,9 +466,10 @@ mod platform {
 
         pub fn get_vcp(&mut self, code: u8) -> Result<(u32, u32), String> {
             unsafe {
+                let mut vct = 0u32;
                 let mut current = 0u32;
                 let mut max = 0u32;
-                if GetVCPFeatureAndVCPFeatureReply(self.hphysical, code, &mut current, &mut max) == 0 {
+                if GetVCPFeatureAndVCPFeatureReply(self.hphysical, code, &mut vct, &mut current, &mut max) == 0 {
                     Err(format!("GetVCPFeatureAndVCPFeatureReply(0x{code:02X}) failed: {}", last_error()))
                 } else {
                     Ok((current, max))

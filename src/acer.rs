@@ -1,4 +1,6 @@
 use crate::monitor::Monitor;
+use std::thread::sleep;
+use std::time::Duration;
 
 pub fn power_mode(mon: &mut Monitor, on: bool) -> Result<(), String> {
     mon.set_vcp(0xD6, if on { 1 } else { 5 })
@@ -10,46 +12,55 @@ pub fn factory_reset(mon: &mut Monitor) -> Result<(), String> {
 
 pub fn key_lock(mon: &mut Monitor, on: bool) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x00)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, if on { 1 } else { 0 })
 }
 
 pub fn power_key(mon: &mut Monitor, on: bool) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x01)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, if on { 1 } else { 0 })
 }
 
 pub fn power_indicator(mon: &mut Monitor, on: bool) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x02)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, if on { 1 } else { 0 })
 }
 
 pub fn overdrive(mon: &mut Monitor, value: u32) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x04)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, value)
 }
 
 pub fn aim_type(mon: &mut Monitor, value: u32) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x06)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, value)
 }
 
 pub fn refresh_rate_num(mon: &mut Monitor, on: bool) -> Result<(), String> {
     mon.set_vcp(0xE0, 0x05)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE1, if on { 1 } else { 0 })
 }
 
 pub fn blue_light(mon: &mut Monitor, value: u32) -> Result<(), String> {
     mon.set_vcp(0xE7, 0x00)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE8, value)
 }
 
 pub fn gamma(mon: &mut Monitor, value: u32) -> Result<(), String> {
     mon.set_vcp(0xE7, 0x01)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE8, value)
 }
 
 pub fn color_temp(mon: &mut Monitor, value: u32) -> Result<(), String> {
     mon.set_vcp(0xE7, 0x02)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xE8, value)
 }
 
@@ -59,6 +70,7 @@ pub fn display_mode(mon: &mut Monitor, value: u32) -> Result<(), String> {
 
 pub fn color_space(mon: &mut Monitor, calibration_index: u32, space_index: u32) -> Result<(), String> {
     mon.set_vcp(0xE9, calibration_index)?;
+    sleep(Duration::from_millis(35));
     mon.set_vcp(0xEA, space_index)
 }
 
@@ -66,14 +78,17 @@ pub fn raw_bank(mon: &mut Monitor, bank: u8, selector: u32, value: u32) -> Resul
     match bank {
         0xE0 => {
             mon.set_vcp(0xE0, selector)?;
+            sleep(Duration::from_millis(35));
             mon.set_vcp(0xE1, value)
         }
         0xE7 => {
             mon.set_vcp(0xE7, selector)?;
+            sleep(Duration::from_millis(35));
             mon.set_vcp(0xE8, value)
         }
         0xE9 => {
             mon.set_vcp(0xE9, selector)?;
+            sleep(Duration::from_millis(35));
             mon.set_vcp(0xEA, value)
         }
         _ => Err(format!("Unsupported bank 0x{bank:02X}; use e0, e7, or e9")),

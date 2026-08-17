@@ -76,7 +76,8 @@ extern "system" {
         hMonitor: HANDLE,
         bVCPCode: u8,
         pvct: *mut DWORD,
-        pvcp: *mut DWORD,
+        pdwCurrentValue: *mut DWORD,
+        pdwMaximumValue: *mut DWORD,
     ) -> BOOL;
 
     pub fn GetCapabilitiesStringLength(hMonitor: HANDLE, pdwCapabilitiesStringLength: *mut DWORD) -> BOOL;

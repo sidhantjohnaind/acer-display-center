@@ -128,6 +128,21 @@ To launch or restart the Windows System Tray Widget manually at any time:
 powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "$env:LocalAppData\Programs\acer_monitor_cli\acer-tray.ps1"
 ```
 
+### 🗑️ Uninstallation
+
+#### Windows (1-Click Uninstall):
+Run `uninstall.bat` or execute in PowerShell:
+```powershell
+.\uninstall.ps1
+```
+*Stops background tray processes, unregisters Windows Scheduled Tasks and Startup items, and removes binary folders and PATH entries.*
+
+#### Linux:
+```bash
+./uninstall.sh
+```
+*Stops systemd background services, deletes `/usr/local/bin/amctl` and `~/.local/bin` binaries, and removes desktop shortcuts and GNOME Shell extensions.*
+
 
 ### ⚙️ Building from Source
 
@@ -198,9 +213,10 @@ cargo build --release --target aarch64-pc-windows-msvc
    - Adds sliders and popup submenus for Brightness, Contrast, Volume, Presets, Inputs, Black Boost, and Solar schedule to the top bar.
    - Install with `./install-gnome-extension.sh`.
 
-2. **Windows Taskbar System Tray Widget** (`acer-tray.ps1`):
-   - Adds a native notification area system tray icon next to the Windows clock with right-click popups.
-   - Installed automatically via `.\install.ps1`.
+2. **Windows Taskbar System Tray Widget** (`amctl tray` / `acer-tray.ps1`):
+   - Native notification area system tray icon next to the Windows clock.
+   - Run instantly with `amctl tray` (pure Rust, <1.5 MB RAM, sub-millisecond in-memory hardware control).
+   - Middle-click icon to toggle audio mute, double-click to bump brightness +10%, right/left click for full popup menus.
 
 3. **Rofi / Dmenu Quick Launcher Widget** (`rofi-acer.sh`):
    - Fast keyboard-driven menu for i3, Sway, Hyprland, XFCE, and Openbox window managers.
@@ -267,6 +283,10 @@ amctl info --json              # Output detailed monitor info as JSON
 amctl caps                     # Display raw MCCS capability string report
 amctl scan                     # Probe common VCP feature codes
 amctl scan --json              # Output probe scan results as JSON
+amctl watch-vcp                # Watch and detect real-time VCP code value changes (for any Acer or generic/non-Acer monitor)
+amctl watch-vcp 0x10 0x12 0x60 # Watch specific VCP codes in real-time
+amctl watch-vcp --all          # Probe and monitor all 256 VCP codes (0x00-0xFF)
+amctl watch-vcp --json         # Stream real-time VCP change events in JSON
 amctl edid                     # Display hardware EDID panel readout
 amctl diag                     # Generate a full system diagnostic report
 amctl energy                   # Estimate current wattage draw and annual energy cost
@@ -308,6 +328,9 @@ amctl auto-profile --rule "hl2.exe:gaming.json"
 
 # Hotplug Monitor Watcher (detects display connection changes)
 amctl watch-monitors
+
+# System Tray Application (runs in notification area next to clock)
+amctl tray
 
 # IPC Server Daemon (runs IPC socket server for sub-millisecond hotkey commands)
 amctl server
