@@ -62,7 +62,14 @@ jobs:
           sudo apt-get install -y pkg-config libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev libwayland-dev libclang-dev
 
       - name: Build Binary
-        run: cargo build --verbose --release --target x86_64-unknown-linux-gnu
+        run: |
+          cargo build --verbose --release --target x86_64-unknown-linux-gnu 2>&1 | tee output.txt || {
+            echo "### Build x86_64 Failed" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
 
       - name: Prepare Artifact
         run: |
@@ -106,7 +113,14 @@ jobs:
       - name: Build Binary with zigbuild
         env:
           PKG_CONFIG_ALLOW_CROSS: "1"
-        run: cargo zigbuild --verbose --release --target ${{ matrix.target }}
+        run: |
+          cargo zigbuild --verbose --release --target ${{ matrix.target }} 2>&1 | tee cross-output.txt || {
+            echo "### Build ${{ matrix.target }} Failed" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 cross-output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
 
       - name: Prepare Artifact
         run: |
