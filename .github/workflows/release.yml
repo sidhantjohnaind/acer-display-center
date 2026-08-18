@@ -76,7 +76,7 @@ jobs:
           mkdir -p dist-linux-x64
           cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/amctl-linux-x86_64
           cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/acer_monitor_cli-linux-x86_64
-          cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/amctl
+          cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/amctl-x86_64-unknown-linux-gnu
           chmod +x dist-linux-x64/*
           ls -la dist-linux-x64/
 
@@ -156,18 +156,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
-
-      - name: Flatten Artifacts
-        run: |
-          mkdir -p release-dist
-          find release-artifacts -type f -exec cp {} release-dist/ \; 2>/dev/null || true
-          cp dist/* release-dist/ 2>/dev/null || true
-          ls -lh release-dist/
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-dist/*
+          files: release-artifacts/*
           overwrite: true
           draft: false
           prerelease: false
