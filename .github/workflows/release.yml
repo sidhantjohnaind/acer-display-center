@@ -62,7 +62,7 @@ jobs:
           sudo apt-get install -y pkg-config libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev libwayland-dev libclang-dev
 
       - name: Build Binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: cargo build --verbose --release --target x86_64-unknown-linux-gnu
 
       - name: Prepare Artifact
         run: |
@@ -104,7 +104,9 @@ jobs:
         uses: taiki-e/install-action@cargo-zigbuild
 
       - name: Build Binary with zigbuild
-        run: cargo zigbuild --release --target ${{ matrix.target }}
+        env:
+          PKG_CONFIG_ALLOW_CROSS: "1"
+        run: cargo zigbuild --verbose --release --target ${{ matrix.target }}
 
       - name: Prepare Artifact
         run: |
