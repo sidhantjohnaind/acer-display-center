@@ -329,16 +329,29 @@ mod win32_tray {
 
         // 3. Brightness Submenu
         let m_bright = CreatePopupMenu();
-        AppendMenuW(m_bright, MF_STRING, 301, to_wide(&hk.menu_item("☀️ 100% (Maximum)", &["brightness", "100", "--osd"])).as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 302, to_wide("☀️ 75%").as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 303, to_wide("☀️ 50% (Balanced)").as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 304, to_wide("☀️ 25%").as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 305, to_wide(&hk.menu_item("🌙 10% (Night Dim)", &["brightness", "10", "--osd"])).as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 306, to_wide("🌙 0% (Minimum)").as_ptr());
+        let is_hdr = crate::hdr::get_os_hdr();
+        if is_hdr {
+            AppendMenuW(m_bright, MF_STRING, 351, to_wide("✨ SDR 100% (~480 nits)").as_ptr());
+            AppendMenuW(m_bright, MF_STRING, 352, to_wide("✨ SDR 75% (~380 nits)").as_ptr());
+            AppendMenuW(m_bright, MF_STRING, 353, to_wide("✨ SDR 50% (~280 nits)").as_ptr());
+            AppendMenuW(m_bright, MF_STRING, 354, to_wide("✨ SDR 25% (~180 nits)").as_ptr());
+            AppendMenuW(m_bright, MF_STRING, 355, to_wide("🌙 SDR 0% (80 nits Paper White)").as_ptr());
+            AppendMenuW(m_bright, MF_SEPARATOR, 0, std::ptr::null());
+            AppendMenuW(m_bright, MF_STRING, 357, to_wide(&hk.menu_item("⬆️ SDR Brightness +10%", &["sdr", "+10", "--osd"])).as_ptr());
+            AppendMenuW(m_bright, MF_STRING, 358, to_wide(&hk.menu_item("⬇️ SDR Brightness -10%", &["sdr", "-10", "--osd"])).as_ptr());
+            AppendMenuW(m_bright, MF_SEPARATOR, 0, std::ptr::null());
+        }
+        AppendMenuW(m_bright, MF_STRING, 301, to_wide(&hk.menu_item("☀️ Hardware 100% (Max)", &["brightness", "100", "--osd"])).as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 302, to_wide("☀️ Hardware 75%").as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 303, to_wide("☀️ Hardware 50%").as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 304, to_wide("☀️ Hardware 25%").as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 305, to_wide(&hk.menu_item("🌙 Hardware 10% (Night Dim)", &["brightness", "10", "--osd"])).as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 306, to_wide("🌙 Hardware 0% (Min)").as_ptr());
         AppendMenuW(m_bright, MF_SEPARATOR, 0, std::ptr::null());
-        AppendMenuW(m_bright, MF_STRING, 307, to_wide(&hk.menu_item("⬆️ Brightness +10%", &["brightness", "+10", "--osd"])).as_ptr());
-        AppendMenuW(m_bright, MF_STRING, 308, to_wide(&hk.menu_item("⬇️ Brightness -10%", &["brightness", "-10", "--osd"])).as_ptr());
-        AppendMenuW(hmenu, MF_POPUP, m_bright as usize, to_wide("☀️ Brightness").as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 307, to_wide(&hk.menu_item("⬆️ Hardware Brightness +10%", &["brightness", "+10", "--osd"])).as_ptr());
+        AppendMenuW(m_bright, MF_STRING, 308, to_wide(&hk.menu_item("⬇️ Hardware Brightness -10%", &["brightness", "-10", "--osd"])).as_ptr());
+        let bright_title = if is_hdr { "☀️ SDR Brightness (HDR Active)" } else { "☀️ Brightness" };
+        AppendMenuW(hmenu, MF_POPUP, m_bright as usize, to_wide(bright_title).as_ptr());
 
         // 4. Contrast Submenu
         let m_contrast = CreatePopupMenu();
@@ -547,7 +560,16 @@ mod win32_tray {
             208 => run_cli(&["preset", "hdr"]),
             209 => run_cli(&["preset", "user"]),
 
-            // Brightness
+            // SDR Brightness (HDR)
+            351 => run_cli(&["sdr", "100", "--osd"]),
+            352 => run_cli(&["sdr", "75", "--osd"]),
+            353 => run_cli(&["sdr", "50", "--osd"]),
+            354 => run_cli(&["sdr", "25", "--osd"]),
+            355 => run_cli(&["sdr", "0", "--osd"]),
+            357 => run_cli(&["sdr", "+10", "--osd"]),
+            358 => run_cli(&["sdr", "-10", "--osd"]),
+
+            // Hardware Brightness
             301 => run_cli(&["brightness", "100", "--osd"]),
             302 => run_cli(&["brightness", "75", "--osd"]),
             303 => run_cli(&["brightness", "50", "--osd"]),
