@@ -53,7 +53,8 @@ curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/
 
 ## ✨ Key Features
 
-* **🎨 Acer Display Center GUI Flyout**: Pure Rust dark studio Quick Settings flyout (<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>) with live hardware sliders, visual preset cards, eye shield toggles, and dedicated `[ 📌 Pin ]` window control.
+* **🎨 Acer Display Center GUI Flyout**: Pure Rust dark studio Quick Settings flyout (<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>) with live hardware sliders, smooth animated physics, visual 4×2 preset grid, eye shield toggles, and `[ 📌 Pin ]` window control (unpinned by default for natural auto-dismiss).
+* **🔄 Dynamic Hardware Sync & Live Spinner**: Dynamic 2.2s sync animation with 1.5s hardware bus stabilization delay and retry backoff for 100% reliable physical DDC/CI reading.
 * **🪟 Native Windows System Tray Daemon (`amctl tray`)**:
   - Low-level Win32 keyboard hook (`WH_KEYBOARD_LL`) with asynchronous DDC/CI hardware bus dispatch.
   - Cascading right-click menu with **live real-time state indicators** (`(Current: 75%)`, `● (Current)`).
@@ -61,8 +62,8 @@ curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/
 * **⚙️ Built-In Global Hotkeys Customizer**: Edit, add, or customize system-wide key combinations with instant JSON persistence.
 * **🖥️ Full Display & Audio Control**: Adjust Brightness, Contrast, Volume, Mute, Power, and Input source (`DP`, `HDMI1`, `HDMI2`, `Auto`, `Next`).
 * **🎮 Acer Hardware Banked VCPs**: Direct hardware access to Black Boost, OverDrive (`od`), AimPoint Crosshair (`aim`), Blue Light Filter (`bluelight`), Gamma, Color Temperature (`colortemp`), and Refresh Rate Counter (`refreshnum`).
-* **🎛️ One-Touch Hardware Presets**: Apply native monitor OSD modes (`user`, `standard`, `eco`, `graphics`, `action`, `racing`, `sports`, `hdr`, `reading`, `movie`).
-* **✨ Unified HDR Bridge**: Seamlessly synchronizes Windows 11 OS HDR with Monitor Hardware HDR in a single switch.
+* **🎛️ 8 Physical Hardware Presets**: Direct access to the monitor's 8 physical OSD modes (`action`, `standard`, `hdr`, `eco`, `racing`, `sports`, `graphics`, `user`) with EEPROM profile support.
+* **✨ Unified HDR Bridge**: Seamlessly synchronizes Windows 11 OS HDR with Monitor Hardware HDR in a single atomic switch.
 * **🌊 Smooth Parameter Fading**: Transition brightness, contrast, or volume smoothly over custom time durations (`fade`).
 * **☀️ Solar Circadian Auto-Scheduler**: Automatically shifts display brightness and color temperature between day and night based on GPS coordinates.
 * **🌙 Smart Inactivity Idle Dimmer**: Dims screen after inactivity, with automatic inhibition during media playback.
@@ -85,8 +86,8 @@ Press **<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>** or left-click the Syst
   <img src="assets/tab_tools.png" width="48%" alt="Tools Tab - Unified HDR Bridge, 9 Accent Themes, Keylock, Diagnostics & Calibration" />
 </p>
 
-- **Header Controls**: `[ 📌 Pin Window ]`, `[ 🎨 9 Accent Color Themes ]`, and `[ 🔄 Re-sync ]`.
-- **Display Tab**: Smooth Brightness, Contrast, Volume & Mute sliders, 9 Hardware Picture Presets, and Active Video Input Switcher.
+- **Header Controls**: `[ 📌 Pin Window ]`, `[ 🎨 9 Accent Color Themes ]`, and `[ 🔄 Re-sync ]` with live spinning loader.
+- **Display Tab**: Smooth animated Brightness, Contrast, Volume & Mute sliders, 8 Hardware Picture Presets (4×2 Grid), and Active Video Input Switcher.
 - **Gaming & Esports**: Response Time OverDrive (`Extreme` / `Normal` / `Off`), Black Boost Shadow Equalizer (0–10), Hardware AimPoint Crosshairs (`Dot` / `Cross` / `Triangle`), and Refresh Rate (Hz / FPS) HUD.
 - **Color & Eye Shield**: Blue Light Filter (Level 1–4), Color Temperature (Warm / Normal / Cool / BlueLight / User), Gamma Curve (1.8 / 2.0 / 2.2 / 2.4 / 2.6), Color Space (sRGB / DCI-P3 / Rec.709 / HDR / EBU / SMPTE-C).
 - **Hardware & Power Tools**: Unified HDR Master Switch, Global Hotkeys Master Toggle, 9 UI Accent Themes, Physical OSD Keylock, Energy Estimator, Diagnostic Scanner, Calibration Patterns, and Factory Reset.
@@ -101,7 +102,7 @@ Right-click the notification area icon for instant access to cascading hardware 
 
 - `🚀 Open Acer Display Center` (Dynamic accelerator key binding lookup)
 - `🔄 Refresh Monitor State Now`
-- `🎮 Picture Presets` (Action, Racing, Sports, Standard, ECO, Movie, Graphics, HDR Game, User)
+- `🎮 Picture Presets` (Action, Racing, Sports, Standard, ECO, Graphics, HDR Game, User)
 - `☀️ Brightness` (100%, 75%, 50%, 25%, 10% Night Dim, 0%, +10%, -10%)
 - `🌓 Contrast` (80% down to 20%)
 - `🎯 Gaming & Esports` (AimPoint Crosshairs, Toggle FPS/Hz HUD, OverDrive Extreme/Normal/Off, Black Boost 0–10)
