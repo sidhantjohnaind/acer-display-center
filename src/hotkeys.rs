@@ -31,7 +31,6 @@ pub const ACTION_TEMPLATES: &[ShortcutActionTemplate] = &[
     ShortcutActionTemplate { label: "Racing Mode Preset", description: "Switches monitor to ultra-low latency Racing mode", command: &["preset", "racing"], default_key: "R" },
     ShortcutActionTemplate { label: "Sports Mode Preset", description: "Switches monitor to Sports mode", command: &["preset", "sports"], default_key: "S" },
     ShortcutActionTemplate { label: "Standard Preset", description: "Switches monitor to Standard mode", command: &["preset", "standard"], default_key: "N" },
-    ShortcutActionTemplate { label: "Movie Cinema Preset", description: "Switches monitor to Movie mode", command: &["preset", "movie"], default_key: "C" },
     ShortcutActionTemplate { label: "Graphics Preset", description: "Switches monitor to Graphics mode", command: &["preset", "graphics"], default_key: "G" },
     ShortcutActionTemplate { label: "User Custom Preset", description: "Switches monitor to User custom mode", command: &["preset", "user"], default_key: "U" },
     ShortcutActionTemplate { label: "Dim Screen (10%)", description: "Instantly dims screen to 10% brightness", command: &["brightness", "10", "--osd"], default_key: "D" },
