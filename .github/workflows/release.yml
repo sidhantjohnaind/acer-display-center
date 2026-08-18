@@ -36,6 +36,13 @@ jobs:
           mkdir -p dist
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl-${{ matrix.target }}.exe"
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/acer_monitor_cli-${{ matrix.target }}.exe"
+          if ("${{ matrix.target }}" -eq "x86_64-pc-windows-msvc") {
+            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl.exe"
+            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/acer_monitor_cli.exe"
+          }
+          if ("${{ matrix.target }}" -eq "aarch64-pc-windows-msvc") {
+            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl-arm64.exe"
+          }
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -72,7 +79,17 @@ jobs:
         run: |
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-${{ matrix.target }}"
-          chmod +x "dist/amctl-${{ matrix.target }}"
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-x86_64"
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl"
+          fi
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-arm64"
+          fi
+          if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-riscv64"
+          fi
+          chmod +x dist/*
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
