@@ -546,7 +546,11 @@ impl AcerQuickSettingsApp {
         let _ = settings.save();
     }
 
-    fn send_cmd(&self, args: &[&str]) {
+    fn send_cmd(&mut self, args: &[&str]) {
+        let first_arg = args.first().copied().unwrap_or_default();
+        if matches!(first_arg, "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sync") {
+            self.last_sync_instant = Some(Instant::now());
+        }
         let vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         let _ = self.tx_cmd.send(vec);
     }
