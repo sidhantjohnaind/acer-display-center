@@ -212,16 +212,18 @@ pub fn set_sdr_white_level(percent: u32) -> Result<(), String> {
         QueryDisplayConfig,
     };
 
-    const DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL: i32 = 17;
+    const DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL: i32 = 0xFFFFFFEE_u32 as i32; // -18
 
     #[repr(C)]
-    struct DisplayConfigSdrWhiteLevel {
+    struct DisplayConfigSetSdrWhiteLevel {
         header: DISPLAYCONFIG_DEVICE_INFO_HEADER,
         sdr_white_level: u32,
+        final_value: u8,
     }
 
     let pct = percent.min(100);
-    let raw = 1000 + (pct as f32 / 100.0 * 5000.0) as u32;
+    // 0% = 1000 (80 nits), 100% = 6000 (480 nits)
+    let raw = 1000 + (pct as f32 / 100.0 * 5000.0).round() as u32;
 
     unsafe {
         let mut path_count: u32 = 0;
@@ -245,14 +247,15 @@ pub fn set_sdr_white_level(percent: u32) -> Result<(), String> {
         }
 
         for path in &paths {
-            let mut req = DisplayConfigSdrWhiteLevel {
+            let mut req = DisplayConfigSetSdrWhiteLevel {
                 header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
                     r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL),
-                    size: std::mem::size_of::<DisplayConfigSdrWhiteLevel>() as u32,
+                    size: std::mem::size_of::<DisplayConfigSetSdrWhiteLevel>() as u32,
                     adapterId: path.targetInfo.adapterId,
                     id: path.targetInfo.id,
                 },
                 sdr_white_level: raw,
+                final_value: 1,
             };
             let res = DisplayConfigSetDeviceInfo(&mut req.header);
             if res != 0 {
