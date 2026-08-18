@@ -764,16 +764,18 @@ mod platform {
                     let path = entry.path();
                     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                     if name.starts_with("i2c-") {
-                        if let Ok(mut dev) = I2cDevice::new(&path) {
-                            if let Ok((_v, _)) = dev.get_vcp_feature(0x10).map(|r| (r.value(), r.maximum())) {
-                                let desc = format!("Monitor on /dev/{name}");
-                                let mut mon = Monitor {
-                                    description: desc,
-                                    capabilities: MonitorCapabilities::default(),
-                                    device: dev,
-                                };
-                                let _ = mon.update_capabilities();
-                                monitors.push(mon);
+                        if let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(&path) {
+                            if let Ok(mut dev) = I2cDevice::new(file) {
+                                if dev.get_vcp_feature(0x10).is_ok() {
+                                    let desc = format!("Monitor on /dev/{name}");
+                                    let mut mon = Monitor {
+                                        description: desc,
+                                        capabilities: MonitorCapabilities::default(),
+                                        device: dev,
+                                    };
+                                    let _ = mon.update_capabilities();
+                                    monitors.push(mon);
+                                }
                             }
                         }
                     }
