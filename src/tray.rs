@@ -855,3 +855,11 @@ pub fn run_tray() -> Result<(), String> {
 
 #[cfg(not(windows))]
 pub fn spawn_gui() {}
+
+#[cfg(not(windows))]
+pub fn are_hotkeys_enabled() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn set_hotkeys_enabled(_on: bool) {}
