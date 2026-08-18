@@ -74,15 +74,10 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-linux-x64
-          for f in target/*/release/acer_monitor_cli target/release/acer_monitor_cli; do
-            if [ -f "$f" ]; then
-              cp -f "$f" dist-linux-x64/amctl-linux-x86_64
-              cp -f "$f" dist-linux-x64/acer_monitor_cli-linux-x86_64
-              cp -f "$f" dist-linux-x64/amctl
-              chmod +x dist-linux-x64/*
-              break
-            fi
-          done
+          cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/amctl-linux-x86_64
+          cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/acer_monitor_cli-linux-x86_64
+          cp target/x86_64-unknown-linux-gnu/release/acer_monitor_cli dist-linux-x64/amctl
+          chmod +x dist-linux-x64/*
           ls -la dist-linux-x64/
 
       - name: Upload Artifact
@@ -131,22 +126,17 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-cross
-          for f in target/*/release/acer_monitor_cli target/release/acer_monitor_cli; do
-            if [ -f "$f" ]; then
-              cp -f "$f" "dist-cross/amctl-${{ matrix.target }}"
-              cp -f "$f" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
-              if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-                cp -f "$f" "dist-cross/amctl-linux-arm64"
-                cp -f "$f" "dist-cross/acer_monitor_cli-linux-arm64"
-              fi
-              if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
-                cp -f "$f" "dist-cross/amctl-linux-riscv64"
-                cp -f "$f" "dist-cross/acer_monitor_cli-linux-riscv64"
-              fi
-              chmod +x dist-cross/*
-              break
-            fi
-          done
+          cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/amctl-${{ matrix.target }}"
+          cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/amctl-linux-arm64"
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/acer_monitor_cli-linux-arm64"
+          fi
+          if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/amctl-linux-riscv64"
+            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist-cross/acer_monitor_cli-linux-riscv64"
+          fi
+          chmod +x dist-cross/*
           ls -la dist-cross/
 
       - name: Upload Artifact
@@ -178,6 +168,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-dist/*
+          overwrite: true
           draft: false
           prerelease: false
           generate_release_notes: true
