@@ -1,6 +1,8 @@
+use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 use eframe::egui::{self, Color32, Margin, Pos2, Rect, Rounding, Stroke, Vec2};
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Tab {
@@ -10,7 +12,7 @@ pub enum Tab {
     Tools,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccentTheme {
     CyberCyan,      // #38BDF8
     NitroCrimson,   // #F43F5E
@@ -21,6 +23,58 @@ pub enum AccentTheme {
     SolarGold,      // #FACC15
     NeonPink,       // #EC4899
     MonochromeIce,  // #E2E8F0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuiSettings {
+    pub theme: AccentTheme,
+    pub unified_hdr_bridge: bool,
+    pub is_pinned: bool,
+}
+
+impl Default for GuiSettings {
+    fn default() -> Self {
+        Self {
+            theme: AccentTheme::CyberCyan,
+            unified_hdr_bridge: true,
+            is_pinned: false,
+        }
+    }
+}
+
+impl GuiSettings {
+    pub fn config_path() -> PathBuf {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            let p = PathBuf::from(local)
+                .join("Programs")
+                .join("acer_monitor_cli")
+                .join("gui_settings.json");
+            if let Some(parent) = p.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            p
+        } else {
+            PathBuf::from("gui_settings.json")
+        }
+    }
+
+    pub fn load() -> Self {
+        let path = Self::config_path();
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            if let Ok(cfg) = serde_json::from_str::<Self>(&data) {
+                return cfg;
+            }
+        }
+        let def = Self::default();
+        let _ = def.save();
+        def
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        let path = Self::config_path();
+        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        std::fs::write(&path, json).map_err(|e| e.to_string())
+    }
 }
 
 impl AccentTheme {
@@ -348,9 +402,10 @@ impl AcerQuickSettingsApp {
         });
 
         let past = Instant::now() - Duration::from_secs(10);
+        let settings = GuiSettings::load();
         Self {
             selected_tab: Tab::Display,
-            theme: AccentTheme::CyberCyan,
+            theme: settings.theme,
             brightness: 80,
             contrast: 50,
             volume: 100,
@@ -358,7 +413,7 @@ impl AcerQuickSettingsApp {
             black_boost: 5,
             selected_preset: "Action".into(),
             is_hdr_active: is_hdr,
-            unified_hdr_bridge: true,
+            unified_hdr_bridge: settings.unified_hdr_bridge,
             hotkeys_enabled: true,
             hotkey_config: crate::hotkeys::HotkeyConfig::load(),
             editing_hotkeys: false,
@@ -388,10 +443,19 @@ impl AcerQuickSettingsApp {
             last_user_preset_edit: past,
             created_at: Instant::now(),
             has_been_focused: false,
-            is_pinned: false,
+            is_pinned: settings.is_pinned,
             report_modal: None,
             rx_report,
         }
+    }
+
+    fn save_settings(&self) {
+        let settings = GuiSettings {
+            theme: self.theme,
+            unified_hdr_bridge: self.unified_hdr_bridge,
+            is_pinned: self.is_pinned,
+        };
+        let _ = settings.save();
     }
 
     fn send_cmd(&self, args: &[&str]) {
@@ -585,6 +649,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         );
                         if pin_resp.clicked() {
                             self.is_pinned = !self.is_pinned;
+                            self.save_settings();
                             if self.is_pinned {
                                 self.show_toast("Window Pinned (Stays Open)");
                             } else {
@@ -608,6 +673,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         );
                         if th_resp.clicked() {
                             self.theme = self.theme.next();
+                            self.save_settings();
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
@@ -1026,6 +1092,7 @@ impl AcerQuickSettingsApp {
 
         if resp.clicked() {
             self.unified_hdr_bridge = !self.unified_hdr_bridge;
+            self.save_settings();
             if self.unified_hdr_bridge {
                 self.show_toast("Unified HDR Bridge ON (Syncs Windows + Monitor)");
             } else {
@@ -1535,6 +1602,7 @@ impl AcerQuickSettingsApp {
 
                 if Self::render_card_button(ui, btn_id, t.name(), is_sel, Vec2::new(theme_w, 25.0), t.primary()).clicked() {
                     self.theme = t;
+                    self.save_settings();
                     self.show_toast(format!("Theme set to {}", t.name()));
                 }
                 if (i + 1) % 3 == 0 { ui.end_row(); }
