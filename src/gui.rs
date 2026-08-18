@@ -263,6 +263,30 @@ impl AcerQuickSettingsApp {
     }
 
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let mut fonts = egui::FontDefinitions::default();
+        #[cfg(windows)]
+        {
+            if let Ok(segui_bytes) = std::fs::read("C:\\Windows\\Fonts\\seguiemj.ttf") {
+                fonts.font_data.insert(
+                    "seguiemj".to_owned(),
+                    egui::FontData::from_owned(segui_bytes),
+                );
+                if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+                    vec.push("seguiemj".to_owned());
+                }
+            }
+            if let Ok(sym_bytes) = std::fs::read("C:\\Windows\\Fonts\\seguisym.ttf") {
+                fonts.font_data.insert(
+                    "seguisym".to_owned(),
+                    egui::FontData::from_owned(sym_bytes),
+                );
+                if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+                    vec.push("seguisym".to_owned());
+                }
+            }
+        }
+        _cc.egui_ctx.set_fonts(fonts);
+
         let (tx_cmd, rx_cmd) = channel::<Vec<String>>();
         let (tx_status, rx_status) = channel::<String>();
         let (tx_state, rx_state) = channel::<MonitorStateUpdate>();
@@ -683,7 +707,7 @@ impl eframe::App for AcerQuickSettingsApp {
                 } else {
                     // Pixel-Perfect Segmented Navigation Bar
                     let tabs = [
-                        (Tab::Display, "☀️ Display"),
+                        (Tab::Display, "☀ Display"),
                         (Tab::Gaming, "🎯 Gaming"),
                         (Tab::Color, "🎨 Color"),
                         (Tab::Tools, "🛠 Tools"),
@@ -729,10 +753,11 @@ impl eframe::App for AcerQuickSettingsApp {
                             Color32::from_rgb(148, 163, 184)
                         };
 
+                        let clean_name = name.replace(['\u{FE0F}', '\u{FE0E}'], "");
                         ui.painter().text(
                             btn_rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            name,
+                            clean_name,
                             egui::FontId::proportional(11.5),
                             text_color,
                         );
@@ -854,10 +879,11 @@ impl AcerQuickSettingsApp {
         painter.rect_filled(rect, rounding, bg_color);
         painter.rect_stroke(rect, rounding, Stroke::new(1.0 + anim_val * 0.5, stroke_color));
 
+        let clean_text = text.replace(['\u{FE0F}', '\u{FE0E}'], "");
         painter.text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
-            text,
+            clean_text,
             egui::FontId::proportional(11.0),
             text_color,
         );
@@ -1158,7 +1184,7 @@ impl AcerQuickSettingsApp {
     fn render_display_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
         let mut b_val = self.brightness;
         let mut b_change = self.last_b_change;
-        if self.render_slider_card(ui, "☀️ Brightness", &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
+        if self.render_slider_card(ui, "☀ Brightness", &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
             self.last_user_b_edit = Instant::now();
         }
         self.brightness = b_val;
@@ -1231,16 +1257,16 @@ impl AcerQuickSettingsApp {
         self.last_v_change = v_change;
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("🎮  Display Presets").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🎮 Display Presets").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         // 3x3 Preset Grid with Clean Typography (Zero Missing Font Boxes)
         let presets = [
-            ("⚔️ Action", "action", 100, 50),
+            ("⚔ Action", "action", 100, 50),
             ("⚡ Standard", "standard", 80, 50),
             ("✨ HDR Game", "hdr", 100, 50),
             ("🌱 ECO", "eco", 20, 50),
-            ("🏎️ Racing", "racing", 100, 50),
+            ("🏁 Racing", "racing", 100, 50),
             ("⚽ Sports", "sports", 100, 50),
             ("🎬 Movie", "movie", 70, 55),
             ("🎨 Graphics", "graphics", 80, 50),
@@ -1290,7 +1316,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("🔌  Input Source").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🔌 Input Source").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let inputs = [("🔌 DP", "dp"), ("📺 HDMI 1", "hdmi1"), ("📺 HDMI 2", "hdmi2"), ("🔄 AUTO", "auto"), ("⏭ NEXT", "next")];
@@ -1385,7 +1411,7 @@ impl AcerQuickSettingsApp {
     }
 
     fn render_color_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
-        ui.label(egui::RichText::new("🌡️  Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🌡  Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let temps = [
@@ -1412,7 +1438,7 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(5.0);
-        ui.label(egui::RichText::new("🛡️  Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("🛡  Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
         let bls = [("Off", 0), ("50%", 1), ("60%", 2), ("70%", 3), ("80%", 4)];
@@ -1563,7 +1589,7 @@ impl AcerQuickSettingsApp {
             }
 
             let max_id = egui::Id::new("tool_max");
-            if Self::render_card_button(ui, max_id, "☀️ Max 100%", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, max_id, "☀ Max 100%", false, Vec2::new(half_w, 25.0), accent).clicked() {
                 self.brightness = 100;
                 self.show_toast("Brightness set to Maximum 100%");
                 self.send_cmd(&["brightness", "100"]);
@@ -1599,7 +1625,7 @@ impl AcerQuickSettingsApp {
             }
 
             let reset_id = egui::Id::new("tool_reset");
-            if Self::render_card_button(ui, reset_id, "⚠️ Factory Reset", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
+            if Self::render_card_button(ui, reset_id, "⚠ Factory Reset", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
                 self.show_toast("Monitor Reset to Defaults");
                 self.send_cmd(&["reset"]);
             }
@@ -1609,7 +1635,7 @@ impl AcerQuickSettingsApp {
     fn render_hotkey_editor(&mut self, ui: &mut egui::Ui, accent: Color32) {
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new("⚙️ Hotkeys Customizer")
+                egui::RichText::new("⚙ Hotkeys Customizer")
                     .strong()
                     .size(12.5)
                     .color(Color32::WHITE),
