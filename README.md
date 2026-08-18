@@ -116,6 +116,17 @@ Right-click the notification area icon for instant access to cascading hardware 
 
 ## 📦 Installation & Releases
 
+### 🚀 Direct Binary Downloads (v1.2.0)
+
+| Platform | Architecture | Binary Package | Description |
+| :--- | :--- | :--- | :--- |
+| **🪟 Windows** | `x86_64` (AMD64) | [**`amctl.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl.exe) \| [`acer_monitor_cli.exe`](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/acer_monitor_cli.exe) | Complete suite: GUI Flyout, System Tray Daemon & CLI |
+| **🐧 Linux** | `x86_64` (amd64) | [**`amctl-linux-x86_64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-x86_64) | Standalone Linux x86_64 CLI & IPC Server |
+| **🐧 Linux** | `aarch64` (ARM64) | [**`amctl-linux-arm64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-arm64) | ARM64 Linux, Raspberry Pi 4/5, SBCs |
+| **🐧 Linux** | `riscv64gc` (RISC-V 64) | [**`amctl-linux-riscv64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-riscv64) | RISC-V 64-bit Linux boards & emulators |
+
+---
+
 ### 🪟 Windows Install
 Run the 1-click install command or download the latest `.exe` from [Releases](https://github.com/sidhantjohnaind/acer-display-center/releases):
 ```powershell
@@ -127,11 +138,18 @@ irm https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/i
 curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.sh | bash
 ```
 
-### 🐧 Linux AppImage (Portable)
-Download and run the standalone **AppImage** on any Linux distribution without compiling:
+### 🐧 Linux Manual Setup (Any Distro / Architecture)
+Download the binary for your architecture from [Releases](https://github.com/sidhantjohnaind/acer-display-center/releases):
 ```bash
-chmod +x amctl-x86_64.AppImage
-./amctl-x86_64.AppImage info
+# Example for x86_64 (amd64):
+wget https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-x86_64 -O amctl
+chmod +x amctl
+sudo mv amctl /usr/local/bin/
+
+# Ensure i2c-dev module is loaded for DDC/CI hardware bus communication:
+sudo modprobe i2c-dev
+echo "i2c-dev" | sudo tee /etc/modules-load.d/i2c-dev.conf
+sudo usermod -aG i2c $USER
 ```
 
 This performs the complete Windows setup:
