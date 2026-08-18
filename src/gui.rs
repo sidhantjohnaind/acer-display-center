@@ -26,10 +26,53 @@ pub enum AccentTheme {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedMonitorState {
+    pub brightness: u32,
+    pub contrast: u32,
+    pub volume: u32,
+    pub is_muted: bool,
+    pub black_boost: u32,
+    pub selected_preset: String,
+    pub overdrive: u32,
+    pub blue_light: u32,
+    pub aimpoint: u32,
+    pub hz_counter: bool,
+    pub color_temp: String,
+    pub gamma: String,
+    pub color_space: String,
+    pub selected_input: String,
+    pub monitor_name: String,
+}
+
+impl Default for CachedMonitorState {
+    fn default() -> Self {
+        Self {
+            brightness: 80,
+            contrast: 50,
+            volume: 75,
+            is_muted: false,
+            black_boost: 5,
+            selected_preset: "User".into(),
+            overdrive: 1,
+            blue_light: 0,
+            aimpoint: 0,
+            hz_counter: false,
+            color_temp: "normal".into(),
+            gamma: "22".into(),
+            color_space: "sRGB".into(),
+            selected_input: "DP".into(),
+            monitor_name: "Acer Nitro VG271U".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuiSettings {
     pub theme: AccentTheme,
     pub unified_hdr_bridge: bool,
     pub is_pinned: bool,
+    #[serde(default)]
+    pub last_state: CachedMonitorState,
 }
 
 impl Default for GuiSettings {
@@ -38,6 +81,7 @@ impl Default for GuiSettings {
             theme: AccentTheme::CyberCyan,
             unified_hdr_bridge: true,
             is_pinned: false,
+            last_state: CachedMonitorState::default(),
         }
     }
 }
@@ -406,26 +450,26 @@ impl AcerQuickSettingsApp {
         Self {
             selected_tab: Tab::Display,
             theme: settings.theme,
-            brightness: 80,
-            contrast: 50,
-            volume: 100,
-            is_muted: false,
-            black_boost: 5,
-            selected_preset: "Action".into(),
+            brightness: settings.last_state.brightness,
+            contrast: settings.last_state.contrast,
+            volume: settings.last_state.volume,
+            is_muted: settings.last_state.is_muted,
+            black_boost: settings.last_state.black_boost,
+            selected_preset: settings.last_state.selected_preset,
             is_hdr_active: is_hdr,
             unified_hdr_bridge: settings.unified_hdr_bridge,
             hotkeys_enabled: true,
             hotkey_config: crate::hotkeys::HotkeyConfig::load(),
             editing_hotkeys: false,
-            overdrive: 1,
-            blue_light: 0,
-            aimpoint: 0,
-            hz_counter: false,
-            color_temp: "normal".into(),
-            gamma: "22".into(),
-            color_space: "sRGB".into(),
-            selected_input: "DP".into(),
-            monitor_name: "Acer Nitro VG271U".into(),
+            overdrive: settings.last_state.overdrive,
+            blue_light: settings.last_state.blue_light,
+            aimpoint: settings.last_state.aimpoint,
+            hz_counter: settings.last_state.hz_counter,
+            color_temp: settings.last_state.color_temp,
+            gamma: settings.last_state.gamma,
+            color_space: settings.last_state.color_space,
+            selected_input: settings.last_state.selected_input,
+            monitor_name: settings.last_state.monitor_name,
             status_text: "Connected via DDC/CI".into(),
             tx_cmd,
             rx_status,
@@ -454,6 +498,23 @@ impl AcerQuickSettingsApp {
             theme: self.theme,
             unified_hdr_bridge: self.unified_hdr_bridge,
             is_pinned: self.is_pinned,
+            last_state: CachedMonitorState {
+                brightness: self.brightness,
+                contrast: self.contrast,
+                volume: self.volume,
+                is_muted: self.is_muted,
+                black_boost: self.black_boost,
+                selected_preset: self.selected_preset.clone(),
+                overdrive: self.overdrive,
+                blue_light: self.blue_light,
+                aimpoint: self.aimpoint,
+                hz_counter: self.hz_counter,
+                color_temp: self.color_temp.clone(),
+                gamma: self.gamma.clone(),
+                color_space: self.color_space.clone(),
+                selected_input: self.selected_input.clone(),
+                monitor_name: self.monitor_name.clone(),
+            },
         };
         let _ = settings.save();
     }
@@ -529,7 +590,9 @@ impl eframe::App for AcerQuickSettingsApp {
             self.report_modal = Some((title, body));
         }
 
+        let mut had_state_change = false;
         while let Ok(st) = self.rx_state.try_recv() {
+            had_state_change = true;
             if let Some(b) = st.brightness {
                 if now.duration_since(self.last_user_b_edit) > Duration::from_millis(2500) && self.last_b_change.is_none() {
                     self.brightness = b;
@@ -571,29 +634,37 @@ impl eframe::App for AcerQuickSettingsApp {
             if let Some(stat) = st.status { self.status_text = stat; }
         }
 
+        if had_state_change {
+            self.save_settings();
+        }
+
         // Debounced Sliders
         if let Some((time, val)) = self.last_b_change {
             if now.duration_since(time) >= Duration::from_millis(80) {
                 self.send_cmd(&["brightness", &val.to_string()]);
                 self.last_b_change = None;
+                self.save_settings();
             }
         }
         if let Some((time, val)) = self.last_c_change {
             if now.duration_since(time) >= Duration::from_millis(80) {
                 self.send_cmd(&["contrast", &val.to_string()]);
                 self.last_c_change = None;
+                self.save_settings();
             }
         }
         if let Some((time, val)) = self.last_v_change {
             if now.duration_since(time) >= Duration::from_millis(80) {
                 self.send_cmd(&["volume", &val.to_string()]);
                 self.last_v_change = None;
+                self.save_settings();
             }
         }
         if let Some((time, val)) = self.last_bb_change {
             if now.duration_since(time) >= Duration::from_millis(80) {
-                self.send_cmd(&["blackboost", &val.to_string()]);
+                self.send_cmd(&["bb", &val.to_string()]);
                 self.last_bb_change = None;
+                self.save_settings();
             }
         }
 

@@ -7,6 +7,10 @@
 
 > A high-performance, pure Rust GUI & CLI suite for controlling Acer (and generic VESA MCCS) monitors via DDC/CI on Windows (AMD64 & ARM64) and Linux (x86_64, ARM64, RISC-V 64). Includes the **Acer Display Center GUI Flyout**, **Native System Tray Daemon**, **Global Hotkeys Customizer**, **Sub-Millisecond IPC Engine**, and **Automated Hardware Watchers**.
 
+<p align="center">
+  <img src="assets/acer_display_center.png" alt="Acer Display Center Quick Settings UI" width="420" />
+</p>
+
 ---
 
 ## ⚡ 1-Click Instant Install
