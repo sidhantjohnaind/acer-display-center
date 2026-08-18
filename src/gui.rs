@@ -1481,11 +1481,6 @@ impl AcerQuickSettingsApp {
                             self.send_cmd(&["hdr", "both", "on"]);
                         } else if !is_target_hdr && was_hdr {
                             self.send_cmd(&["hdr", "both", "off"]);
-                            self.send_cmd(&["brightness", &target_b.to_string()]);
-                            self.send_cmd(&["contrast", &target_c.to_string()]);
-                        } else if !is_target_hdr {
-                            self.send_cmd(&["brightness", &target_b.to_string()]);
-                            self.send_cmd(&["contrast", &target_c.to_string()]);
                         }
                     } else {
                         // Unified HDR Bridge is OFF: ONLY change Monitor Hardware! Windows OS HDR untouched.
@@ -1495,11 +1490,8 @@ impl AcerQuickSettingsApp {
                         } else if was_hdr {
                             self.send_cmd(&["hdr", "monitor", "off"]);
                         }
-                        self.send_cmd(&["brightness", &target_b.to_string()]);
-                        self.send_cmd(&["contrast", &target_c.to_string()]);
                     }
                     self.save_settings();
-                    self.refresh_hardware();
                 }
                 if (i + 1) % 3 == 0 { ui.end_row(); }
             }
