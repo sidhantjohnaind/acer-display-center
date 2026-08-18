@@ -1829,24 +1829,6 @@ impl AcerQuickSettingsApp {
             }
         });
 
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            let dim_id = egui::Id::new("tool_dim");
-            if Self::render_card_button(ui, dim_id, "🌙 Dim to 10%", false, Vec2::new(half_w, 25.0), accent).clicked() {
-                self.brightness = 10;
-                self.show_toast("Brightness Dimmed to 10%");
-                self.send_cmd(&["brightness", "10"]);
-            }
-
-            let max_id = egui::Id::new("tool_max");
-            if Self::render_card_button(ui, max_id, "☀ Max 100%", false, Vec2::new(half_w, 25.0), accent).clicked() {
-                self.brightness = 100;
-                self.show_toast("Brightness set to Maximum 100%");
-                self.send_cmd(&["brightness", "100"]);
-            }
-        });
-
         ui.add_space(6.0);
         ui.label(egui::RichText::new("📊  Diagnostics & Factory Control").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
