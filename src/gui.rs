@@ -1345,7 +1345,7 @@ impl AcerQuickSettingsApp {
         ui.label(egui::RichText::new("🎯  AimPoint Hardware Crosshair").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
-        let aims = [("Off", 0), ("🔴 Dot", 1), ("✚ Cross 1", 2), ("✜ Cross 2", 3)];
+        let aims = [("Off", 0), ("🔴 Dot", 1), ("✚ Cross", 2), ("▲ Triangle", 3)];
         let aim_w = (ui.available_width() - 12.0) / 4.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;

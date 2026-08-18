@@ -589,7 +589,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             if args.is_empty() {
                 let spec = parse_optional_specifier(&args);
                 let (val, _) = with_monitor(spec, |mon| acer::get_aim_type(mon))?;
-                let name = match val { 0 => "Off", 1 => "Dot", 2 => "Cross 1", 3 => "Cross 2", _ => "Unknown" };
+                let name = match val { 0 => "Off", 1 => "Dot", 2 => "Cross", 3 => "Triangle", _ => "Unknown" };
                 return Ok(format!("AimPoint: {name} ({val})"));
             }
             let val_str = &args[0];
@@ -605,7 +605,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                     "off" | "0" => 0,
                     "dot" | "1" => 1,
                     "cross1" | "cross" | "2" => 2,
-                    "cross2" | "3" => 3,
+                    "cross2" | "triangle" | "3" => 3,
                     other => parse_u32(other)?,
                 };
                 with_monitor(spec, |mon| acer::aim_type(mon, value))?;
