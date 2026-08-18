@@ -74,12 +74,16 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-linux-x64
-          BIN_PATH=$(find target -name "acer_monitor_cli" -not -path "*/deps/*" -not -path "*/build/*" -not -name "*.d" | head -n 1)
-          echo "Found binary at: $BIN_PATH"
-          cp "$BIN_PATH" "dist-linux-x64/amctl-linux-x86_64"
-          cp "$BIN_PATH" "dist-linux-x64/acer_monitor_cli-linux-x86_64"
-          cp "$BIN_PATH" "dist-linux-x64/amctl"
-          chmod +x dist-linux-x64/*
+          for f in target/*/release/acer_monitor_cli target/release/acer_monitor_cli; do
+            if [ -f "$f" ]; then
+              cp -f "$f" dist-linux-x64/amctl-linux-x86_64
+              cp -f "$f" dist-linux-x64/acer_monitor_cli-linux-x86_64
+              cp -f "$f" dist-linux-x64/amctl
+              chmod +x dist-linux-x64/*
+              break
+            fi
+          done
+          ls -la dist-linux-x64/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -127,19 +131,23 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-cross
-          BIN_PATH=$(find target -name "acer_monitor_cli" -not -path "*/deps/*" -not -path "*/build/*" -not -name "*.d" | head -n 1)
-          echo "Found binary at: $BIN_PATH"
-          cp "$BIN_PATH" "dist-cross/amctl-${{ matrix.target }}"
-          cp "$BIN_PATH" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
-          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cp "$BIN_PATH" "dist-cross/amctl-linux-arm64"
-            cp "$BIN_PATH" "dist-cross/acer_monitor_cli-linux-arm64"
-          fi
-          if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
-            cp "$BIN_PATH" "dist-cross/amctl-linux-riscv64"
-            cp "$BIN_PATH" "dist-cross/acer_monitor_cli-linux-riscv64"
-          fi
-          chmod +x dist-cross/*
+          for f in target/*/release/acer_monitor_cli target/release/acer_monitor_cli; do
+            if [ -f "$f" ]; then
+              cp -f "$f" "dist-cross/amctl-${{ matrix.target }}"
+              cp -f "$f" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
+              if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+                cp -f "$f" "dist-cross/amctl-linux-arm64"
+                cp -f "$f" "dist-cross/acer_monitor_cli-linux-arm64"
+              fi
+              if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
+                cp -f "$f" "dist-cross/amctl-linux-riscv64"
+                cp -f "$f" "dist-cross/acer_monitor_cli-linux-riscv64"
+              fi
+              chmod +x dist-cross/*
+              break
+            fi
+          done
+          ls -la dist-cross/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
