@@ -552,6 +552,7 @@ impl AcerQuickSettingsApp {
     }
 
     fn refresh_hardware(&mut self) {
+        self.last_sync_instant = Some(Instant::now());
         let past = Instant::now() - Duration::from_secs(10);
         self.last_user_b_edit = past;
         self.last_user_c_edit = past;
@@ -785,21 +786,63 @@ impl eframe::App for AcerQuickSettingsApp {
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
-                        // 3. Sync Button
+                        // 3. Sync Button with Live Smooth Spinner Animation
                         let is_syncing = self.last_sync_instant
-                            .map(|t| t.elapsed() < Duration::from_millis(1200))
+                            .map(|t| t.elapsed() < Duration::from_millis(1500))
                             .unwrap_or(false);
 
-                        let sync_text = if is_syncing { "Syncing..." } else { "Sync" };
-                        let sync_resp = ui.add(
-                            egui::Button::new(egui::RichText::new(sync_text).size(10.0).color(accent))
-                                .fill(Color32::from_rgb(16, 24, 36))
-                                .stroke(Stroke::new(1.0, accent))
-                                .rounding(Rounding::same(4.0))
-                                .min_size(Vec2::new(48.0, 22.0)),
+                        let (sync_rect, sync_resp) = ui.allocate_exact_size(
+                            Vec2::new(if is_syncing { 62.0 } else { 48.0 }, 22.0),
+                            egui::Sense::click(),
                         );
+                        let is_sync_hov = sync_resp.hovered();
+                        let sync_bg = if is_syncing {
+                            Color32::from_rgba_unmultiplied(accent.r() / 6, accent.g() / 6, accent.b() / 6, 255)
+                        } else if is_sync_hov {
+                            Color32::from_rgb(22, 32, 48)
+                        } else {
+                            Color32::from_rgb(16, 24, 36)
+                        };
+                        let sync_stroke = if is_syncing {
+                            Stroke::new(1.2, accent)
+                        } else if is_sync_hov {
+                            Stroke::new(1.0, accent)
+                        } else {
+                            Stroke::new(1.0, Color32::from_rgb(40, 52, 72))
+                        };
+
+                        ui.painter().rect_filled(sync_rect, Rounding::same(4.0), sync_bg);
+                        ui.painter().rect_stroke(sync_rect, Rounding::same(4.0), sync_stroke);
+
+                        if is_syncing {
+                            let angle = (ui.input(|i| i.time) * 10.0) as f32;
+                            let center = sync_rect.left_center() + Vec2::new(10.0, 0.0);
+                            let r = 4.0;
+                            ui.painter().circle_stroke(center, r, Stroke::new(1.2, Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 100)));
+                            let p1 = center + Vec2::new(angle.cos() * r, angle.sin() * r);
+                            let p2 = center + Vec2::new((angle + 1.8).cos() * r, (angle + 1.8).sin() * r);
+                            ui.painter().line_segment([p1, p2], Stroke::new(1.8, accent));
+                            ui.painter().circle_filled(p1, 1.8, Color32::WHITE);
+
+                            ui.painter().text(
+                                Pos2::new(sync_rect.left() + 20.0, sync_rect.center().y),
+                                egui::Align2::LEFT_CENTER,
+                                "Syncing",
+                                egui::FontId::proportional(9.5),
+                                accent,
+                            );
+                            ctx.request_repaint();
+                        } else {
+                            ui.painter().text(
+                                sync_rect.center(),
+                                egui::Align2::CENTER_CENTER,
+                                "Sync",
+                                egui::FontId::proportional(10.0),
+                                if is_sync_hov { accent } else { Color32::from_rgb(200, 215, 235) },
+                            );
+                        }
+
                         if sync_resp.clicked() {
-                            self.last_sync_instant = Some(Instant::now());
                             self.refresh_hardware();
                             self.show_toast("Refreshing monitor state...");
                         }
