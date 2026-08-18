@@ -74,15 +74,11 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-linux-x64
-          if [ -f "target/x86_64-unknown-linux-gnu/release/acer_monitor_cli" ]; then
-            BIN="target/x86_64-unknown-linux-gnu/release/acer_monitor_cli"
-          else
-            BIN="target/release/acer_monitor_cli"
-          fi
-          echo "Found binary at: $BIN"
-          cp "$BIN" "dist-linux-x64/amctl-linux-x86_64"
-          cp "$BIN" "dist-linux-x64/acer_monitor_cli-linux-x86_64"
-          cp "$BIN" "dist-linux-x64/amctl"
+          BIN_PATH=$(find target -name "acer_monitor_cli" -not -path "*/deps/*" -not -path "*/build/*" -not -name "*.d" | head -n 1)
+          echo "Found binary at: $BIN_PATH"
+          cp "$BIN_PATH" "dist-linux-x64/amctl-linux-x86_64"
+          cp "$BIN_PATH" "dist-linux-x64/acer_monitor_cli-linux-x86_64"
+          cp "$BIN_PATH" "dist-linux-x64/amctl"
           chmod +x dist-linux-x64/*
 
       - name: Upload Artifact
@@ -131,21 +127,17 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist-cross
-          if [ -f "target/${{ matrix.target }}/release/acer_monitor_cli" ]; then
-            BIN="target/${{ matrix.target }}/release/acer_monitor_cli"
-          else
-            BIN="target/release/acer_monitor_cli"
-          fi
-          echo "Found binary at: $BIN"
-          cp "$BIN" "dist-cross/amctl-${{ matrix.target }}"
-          cp "$BIN" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
+          BIN_PATH=$(find target -name "acer_monitor_cli" -not -path "*/deps/*" -not -path "*/build/*" -not -name "*.d" | head -n 1)
+          echo "Found binary at: $BIN_PATH"
+          cp "$BIN_PATH" "dist-cross/amctl-${{ matrix.target }}"
+          cp "$BIN_PATH" "dist-cross/acer_monitor_cli-${{ matrix.target }}"
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cp "$BIN" "dist-cross/amctl-linux-arm64"
-            cp "$BIN" "dist-cross/acer_monitor_cli-linux-arm64"
+            cp "$BIN_PATH" "dist-cross/amctl-linux-arm64"
+            cp "$BIN_PATH" "dist-cross/acer_monitor_cli-linux-arm64"
           fi
           if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
-            cp "$BIN" "dist-cross/amctl-linux-riscv64"
-            cp "$BIN" "dist-cross/acer_monitor_cli-linux-riscv64"
+            cp "$BIN_PATH" "dist-cross/amctl-linux-riscv64"
+            cp "$BIN_PATH" "dist-cross/acer_monitor_cli-linux-riscv64"
           fi
           chmod +x dist-cross/*
 
