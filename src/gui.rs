@@ -301,9 +301,10 @@ fn probe_hardware_state() -> MonitorStateUpdate {
             }
             if let Ok((dm, _)) = mon.get_vcp(0xE2) {
                 let preset_name = map_display_mode(dm);
-                update.selected_preset = Some(preset_name.to_string());
                 let mon_is_hdr = dm == 11 || preset_name.eq_ignore_ascii_case("HDR") || preset_name.eq_ignore_ascii_case("HDR Game");
-                update.is_hdr_active = Some(mon_is_hdr);
+                let active_hdr = mon_is_hdr || is_hdr;
+                update.selected_preset = Some(if active_hdr { "HDR Game".to_string() } else { preset_name.to_string() });
+                update.is_hdr_active = Some(active_hdr);
             }
             update.status = Some(format!("Synced with {}", mon.description));
         }
@@ -714,6 +715,47 @@ impl eframe::App for AcerQuickSettingsApp {
                     ui.label(egui::RichText::new("🖥  ACER DISPLAY CENTER").strong().size(12.0).color(Color32::WHITE));
                     ui.label(egui::RichText::new("·").size(12.0).color(Color32::from_rgb(70, 75, 90)));
                     ui.label(egui::RichText::new("VG271U").size(11.0).color(Color32::from_rgb(148, 163, 184)));
+
+                    ui.add_space(4.0);
+                    // HDR Badge Pill in Header (Clickable Quick Toggle)
+                    let (hdr_pill_rect, hdr_pill_resp) = ui.allocate_exact_size(Vec2::new(58.0, 18.0), egui::Sense::click());
+                    let is_hdr_pill_hov = hdr_pill_resp.hovered();
+                    let (h_bg, h_stroke, h_txt, h_col) = if self.is_hdr_active {
+                        (
+                            self.theme.badge_bg(),
+                            Stroke::new(1.0, accent),
+                            "✨ HDR ON",
+                            Color32::WHITE,
+                        )
+                    } else {
+                        (
+                            if is_hdr_pill_hov { Color32::from_rgb(32, 38, 52) } else { Color32::from_rgb(20, 24, 32) },
+                            Stroke::new(1.0, if is_hdr_pill_hov { Color32::from_rgb(60, 72, 95) } else { Color32::from_rgb(38, 44, 58) }),
+                            "HDR OFF",
+                            Color32::from_rgb(148, 163, 184),
+                        )
+                    };
+                    ui.painter().rect(hdr_pill_rect, Rounding::same(4.0), h_bg, h_stroke);
+                    ui.painter().text(
+                        hdr_pill_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        h_txt,
+                        egui::FontId::proportional(9.5),
+                        h_col,
+                    );
+                    if hdr_pill_resp.clicked() {
+                        let next_hdr = !self.is_hdr_active;
+                        self.is_hdr_active = next_hdr;
+                        if next_hdr {
+                            self.selected_preset = "✨ HDR Game".into();
+                            self.show_toast("Enabling HDR (Windows + Monitor)...");
+                            self.send_cmd(&["hdr", "both", "on"]);
+                        } else {
+                            self.selected_preset = "⚡ Standard".into();
+                            self.show_toast("Disabling HDR (Standard SDR Mode)...");
+                            self.send_cmd(&["hdr", "both", "off"]);
+                        }
+                    }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Pin [ 📌 ] Button (Prevents auto-dismiss)
@@ -1431,8 +1473,20 @@ impl AcerQuickSettingsApp {
         let col_w = (ui.available_width() - 8.0) / 3.0;
         egui::Grid::new("presets_grid").num_columns(3).spacing([4.0, 4.0]).show(ui, |ui| {
             for (i, &(label, cmd, target_b, target_c)) in presets.iter().enumerate() {
+                let clean_sel = self.selected_preset
+                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎬', '🎨', '👤', ' '], "")
+                    .to_ascii_lowercase();
+                let clean_label = label
+                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎬', '🎨', '👤', ' '], "")
+                    .to_ascii_lowercase();
                 let is_sel = self.selected_preset.eq_ignore_ascii_case(cmd)
-                    || self.selected_preset.eq_ignore_ascii_case(label);
+                    || self.selected_preset.eq_ignore_ascii_case(label)
+                    || clean_sel == cmd
+                    || clean_sel == clean_label
+                    || (clean_sel.contains("hdr") && cmd == "hdr")
+                    || (clean_sel.contains("eco") && cmd == "eco")
+                    || (clean_sel.contains("standard") && cmd == "standard")
+                    || (self.is_hdr_active && cmd == "hdr");
                 let btn_id = egui::Id::new(format!("preset_btn_{cmd}"));
 
                 if Self::render_card_button(ui, btn_id, label, is_sel, Vec2::new(col_w, 26.0), accent).clicked() {
@@ -1469,6 +1523,77 @@ impl AcerQuickSettingsApp {
                 if (i + 1) % 3 == 0 { ui.end_row(); }
             }
         });
+
+        // Quick HDR Mode Card on Display Tab
+        ui.add_space(5.0);
+        let (hdr_rect, hdr_resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 34.0), egui::Sense::click());
+        let is_hdr_hov = hdr_resp.hovered();
+        let (hdr_bg, hdr_stroke, hdr_title, hdr_sub, badge_txt, badge_bg, badge_col) = if self.is_hdr_active {
+            (
+                Color32::from_rgba_unmultiplied(accent.r() / 8, accent.g() / 8, accent.b() / 8, 255),
+                Stroke::new(1.2, accent),
+                "✨ High Dynamic Range (HDR)",
+                "Windows 11 HDR & Monitor HDR are active",
+                "HDR ON",
+                self.theme.badge_bg(),
+                Color32::WHITE,
+            )
+        } else {
+            (
+                if is_hdr_hov { Color32::from_rgb(22, 26, 36) } else { Color32::from_rgb(16, 19, 26) },
+                Stroke::new(1.0, if is_hdr_hov { Color32::from_rgb(60, 72, 95) } else { Color32::from_rgb(28, 34, 46) }),
+                "✨ High Dynamic Range (HDR)",
+                "Standard Dynamic Range (SDR) active",
+                "HDR OFF",
+                Color32::from_rgb(24, 28, 36),
+                Color32::from_rgb(148, 163, 184),
+            )
+        };
+
+        let painter = ui.painter();
+        painter.rect_filled(hdr_rect, Rounding::same(6.0), hdr_bg);
+        painter.rect_stroke(hdr_rect, Rounding::same(6.0), hdr_stroke);
+        painter.text(
+            Pos2::new(hdr_rect.left() + 10.0, hdr_rect.top() + 11.0),
+            egui::Align2::LEFT_CENTER,
+            hdr_title,
+            egui::FontId::proportional(11.0),
+            Color32::WHITE,
+        );
+        painter.text(
+            Pos2::new(hdr_rect.left() + 10.0, hdr_rect.top() + 23.0),
+            egui::Align2::LEFT_CENTER,
+            hdr_sub,
+            egui::FontId::proportional(9.0),
+            if self.is_hdr_active { accent } else { Color32::from_rgb(148, 163, 184) },
+        );
+
+        let badge_rect = Rect::from_center_size(
+            Pos2::new(hdr_rect.right() - 36.0, hdr_rect.center().y),
+            Vec2::new(54.0, 20.0),
+        );
+        painter.rect(badge_rect, Rounding::same(4.0), badge_bg, Stroke::new(1.0, if self.is_hdr_active { accent } else { Color32::from_rgb(45, 52, 68) }));
+        painter.text(
+            badge_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            badge_txt,
+            egui::FontId::proportional(10.0),
+            badge_col,
+        );
+
+        if hdr_resp.clicked() {
+            let next_hdr = !self.is_hdr_active;
+            self.is_hdr_active = next_hdr;
+            if next_hdr {
+                self.selected_preset = "✨ HDR Game".into();
+                self.show_toast("Enabling HDR (Windows OS + Display)...");
+                self.send_cmd(&["hdr", "both", "on"]);
+            } else {
+                self.selected_preset = "⚡ Standard".into();
+                self.show_toast("Disabling HDR (Standard SDR Mode)...");
+                self.send_cmd(&["hdr", "both", "off"]);
+            }
+        }
 
         ui.add_space(6.0);
         ui.label(egui::RichText::new("🔌 Input Source").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
