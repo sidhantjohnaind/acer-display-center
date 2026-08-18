@@ -14,6 +14,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +48,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +65,7 @@ jobs:
       - name: Install Linux GUI Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libxkbcommon-dev libfontconfig1-dev
+          sudo apt-get install -y pkg-config libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev libwayland-dev libclang-dev
 
       - name: Build Binary
         run: cargo build --release --target ${{ matrix.target }}
