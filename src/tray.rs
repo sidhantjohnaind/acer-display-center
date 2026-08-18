@@ -657,8 +657,8 @@ mod win32_tray {
                 });
             }
             909 => run_cli_with_notify(&["power", "off"], "🌙 Display Power Control"),
-            910 => run_cli_with_notify(&["raw", "e0", "02", "01"], "💡 Power LED: Enabled"),
-            911 => run_cli_with_notify(&["raw", "e0", "02", "00"], "💡 Power LED: Disabled"),
+            910 => run_cli_with_notify(&["indicator", "on"], "💡 Power LED: Enabled"),
+            911 => run_cli_with_notify(&["indicator", "off"], "💡 Power LED: Disabled"),
             912 => {
                 std::thread::spawn(|| {
                     let _ = crate::cli::dispatch_command(vec!["solar".into()]);
@@ -673,13 +673,13 @@ mod win32_tray {
             }
 
             // Patterns
-            951 => run_cli_with_notify(&["test-pattern", "grid"], "📐 Calibration Grid"),
-            952 => run_cli_with_notify(&["test-pattern", "rgb"], "🌈 RGB Spectrum Gradient"),
-            953 => run_cli_with_notify(&["test-pattern", "white"], "⬜ Dead Pixel Check: White"),
-            954 => run_cli_with_notify(&["test-pattern", "black"], "⬛ Backlight Bleed Check: Black"),
-            955 => run_cli_with_notify(&["test-pattern", "red"], "🟥 Test Pattern: Red"),
-            956 => run_cli_with_notify(&["test-pattern", "green"], "🟩 Test Pattern: Green"),
-            957 => run_cli_with_notify(&["test-pattern", "blue"], "🟦 Test Pattern: Blue"),
+            951 => run_cli(&["test-pattern", "grid"]),
+            952 => run_cli(&["test-pattern", "rgb"]),
+            953 => run_cli(&["test-pattern", "white"]),
+            954 => run_cli(&["test-pattern", "black"]),
+            955 => run_cli(&["test-pattern", "red"]),
+            956 => run_cli(&["test-pattern", "green"]),
+            957 => run_cli(&["test-pattern", "blue"]),
 
             999 => {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);

@@ -330,7 +330,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             sync_monitors(master_spec)
         }
 
-        "solar-schedule" => {
+        "solar" | "solar-schedule" => {
             let lat = parse_flag_val(&args, "--lat").unwrap_or(28.61);
             let lon = parse_flag_val(&args, "--lon").unwrap_or(77.20);
             let day_b = parse_flag_u32(&args, "--day-b").unwrap_or(80);
@@ -546,49 +546,97 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok("OK".to_string())
         }
 
-        "indicator" => {
+        "indicator" | "led" | "power-led" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli indicator <on|off> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_power_indicator(mon))?;
+                return Ok(format!("Power LED Indicator is {}", if val == 1 { "ON" } else { "OFF" }));
             }
-            let on = parse_on_off(&args[0])?;
+            let val_str = &args[0];
             let spec = parse_optional_specifier(&args[1..]);
-            with_monitor(spec, |mon| acer::power_indicator(mon, on))?;
+            if val_str.eq_ignore_ascii_case("toggle") {
+                with_monitor(spec, |mon| {
+                    let (cur, _) = acer::get_power_indicator(mon).unwrap_or((1, 1));
+                    acer::power_indicator(mon, cur != 1)
+                })?;
+            } else {
+                let on = parse_on_off(val_str)?;
+                with_monitor(spec, |mon| acer::power_indicator(mon, on))?;
+            }
             Ok("OK".to_string())
         }
 
-        "od" => {
+        "od" | "overdrive" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli od <value> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_overdrive(mon))?;
+                let name = match val { 0 => "Off", 1 => "Normal", 2 => "Extreme", _ => "Off" };
+                return Ok(format!("OverDrive: {name} ({val})"));
             }
-            let value = parse_u32(&args[0])?;
+            let val_str = &args[0];
+            let value = match val_str.to_ascii_lowercase().as_str() {
+                "off" | "0" => 0,
+                "normal" | "1" => 1,
+                "extreme" | "2" => 2,
+                other => parse_u32(other)?,
+            };
             let spec = parse_optional_specifier(&args[1..]);
             with_monitor(spec, |mon| acer::overdrive(mon, value))?;
             Ok("OK".to_string())
         }
 
-        "aim" => {
+        "aim" | "aimpoint" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli aim <value> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_aim_type(mon))?;
+                let name = match val { 0 => "Off", 1 => "Dot", 2 => "Cross 1", 3 => "Cross 2", _ => "Unknown" };
+                return Ok(format!("AimPoint: {name} ({val})"));
             }
-            let value = parse_u32(&args[0])?;
+            let val_str = &args[0];
             let spec = parse_optional_specifier(&args[1..]);
-            with_monitor(spec, |mon| acer::aim_type(mon, value))?;
+            if val_str.eq_ignore_ascii_case("next") || val_str.eq_ignore_ascii_case("cycle") {
+                with_monitor(spec, |mon| {
+                    let (cur, _) = acer::get_aim_type(mon).unwrap_or((0, 3));
+                    let next = (cur + 1) % 4;
+                    acer::aim_type(mon, next)
+                })?;
+            } else {
+                let value = match val_str.to_ascii_lowercase().as_str() {
+                    "off" | "0" => 0,
+                    "dot" | "1" => 1,
+                    "cross1" | "cross" | "2" => 2,
+                    "cross2" | "3" => 3,
+                    other => parse_u32(other)?,
+                };
+                with_monitor(spec, |mon| acer::aim_type(mon, value))?;
+            }
             Ok("OK".to_string())
         }
 
-        "refreshnum" => {
+        "refreshnum" | "fps" | "hz" | "refresh-rate" => {
+            let spec = parse_optional_specifier(&args[1.min(args.len())..]);
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli refreshnum <on|off> [specifier]".to_string());
+                let (cur, _) = with_monitor(spec, |mon| acer::get_refresh_rate_num(mon))?;
+                return Ok(format!("Refresh Rate (FPS/Hz) HUD is {}", if cur == 1 { "ON" } else { "OFF" }));
             }
-            let on = parse_on_off(&args[0])?;
-            let spec = parse_optional_specifier(&args[1..]);
-            with_monitor(spec, |mon| acer::refresh_rate_num(mon, on))?;
+            let val_str = &args[0];
+            if val_str.eq_ignore_ascii_case("toggle") {
+                with_monitor(spec, |mon| {
+                    let cur = acer::get_refresh_rate_num(mon).map(|(v, _)| v == 1).unwrap_or(false);
+                    acer::refresh_rate_num(mon, !cur)
+                })?;
+            } else {
+                let on = parse_on_off(val_str)?;
+                with_monitor(spec, |mon| acer::refresh_rate_num(mon, on))?;
+            }
             Ok("OK".to_string())
         }
 
-        "bluelight" => {
+        "bluelight" | "blue-light" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli bluelight <0|50|60|70|80> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_blue_light(mon))?;
+                return Ok(format!("Blue Light Shield: Level {val}"));
             }
             let value = parse_bluelight(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
@@ -598,7 +646,10 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
 
         "gamma" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli gamma <18|20|22|24|26> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_gamma(mon))?;
+                let name = match val { 0 => "1.8", 1 => "2.2", 2 => "2.4", _ => "2.2" };
+                return Ok(format!("Gamma: {name} ({val})"));
             }
             let value = parse_gamma(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
@@ -606,9 +657,12 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok("OK".to_string())
         }
 
-        "colortemp" => {
+        "colortemp" | "color-temp" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli colortemp <warm|normal|cool|bluelight|user> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, _) = with_monitor(spec, |mon| acer::get_color_temp(mon))?;
+                let name = match val { 0 => "Cool", 1 => "Normal", 2 => "Warm", 3 => "BlueLight", 4 => "User", _ => "Normal" };
+                return Ok(format!("Color Temperature: {name} ({val})"));
             }
             let value = parse_color_temp(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
@@ -616,7 +670,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok("OK".to_string())
         }
 
-        "displaymode" => {
+        "displaymode" | "display-mode" | "mode" => {
             if args.is_empty() {
                 return Err("Usage: acer_monitor_cli displaymode <value> [specifier]".to_string());
             }
@@ -626,24 +680,56 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok("OK".to_string())
         }
 
-        "colorspace" => {
-            if args.len() < 2 {
-                return Err("Usage: acer_monitor_cli colorspace <calibration_index> <space_index> [specifier]".to_string());
+        "colorspace" | "color-space" => {
+            if args.is_empty() {
+                return Err("Usage: acer_monitor_cli colorspace <srgb|rec709|hdr|ebu|dcip3|smpte-c|general> OR <calib_idx> <space_idx>".to_string());
             }
-            let calib = parse_u32(&args[0])?;
-            let space = parse_u32(&args[1])?;
-            let spec = parse_optional_specifier(&args[2..]);
+            let (calib, space, spec_start) = match args[0].to_ascii_lowercase().as_str() {
+                "srgb" => (0, 0, 1),
+                "rec709" => (0, 1, 1),
+                "hdr" => (0, 2, 1),
+                "ebu" => (0, 3, 1),
+                "dcip3" | "dci" => (0, 4, 1),
+                "smpte-c" | "smpte" => (0, 5, 1),
+                "general" => (0, 6, 1),
+                _ => {
+                    if args.len() < 2 {
+                        return Err("Usage: acer_monitor_cli colorspace <srgb|rec709|hdr|ebu|dcip3|smpte-c> OR <calib_idx> <space_idx>".to_string());
+                    }
+                    let c = parse_u32(&args[0])?;
+                    let s = parse_u32(&args[1])?;
+                    (c, s, 2)
+                }
+            };
+            let spec = parse_optional_specifier(&args[spec_start..]);
             with_monitor(spec, |mon| acer::color_space(mon, calib, space))?;
             Ok("OK".to_string())
         }
 
-        "blackboost" => {
+        "blackboost" | "black-boost" | "bb" => {
             if args.is_empty() {
-                return Err("Usage: acer_monitor_cli blackboost <0-10> [specifier]".to_string());
+                let spec = parse_optional_specifier(&args);
+                let (val, max) = with_monitor(spec, |mon| acer::get_black_boost(mon))?;
+                return Ok(format!("Black Boost: {val}/{max}"));
             }
             let value = parse_u32(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
             with_monitor(spec, |mon| acer::black_boost(mon, value))?;
+            Ok("OK".to_string())
+        }
+
+        "raw" | "rawbank" => {
+            if args.len() < 3 {
+                return Err("Usage: acer_monitor_cli raw <bank_hex> <selector_hex> <value_hex> [specifier]\nExample: acer_monitor_cli raw e0 02 01".to_string());
+            }
+            let bank = u8::from_str_radix(args[0].trim_start_matches("0x").trim_start_matches("0X"), 16)
+                .map_err(|e| format!("Invalid bank hex: {e}"))?;
+            let selector = u32::from_str_radix(args[1].trim_start_matches("0x").trim_start_matches("0X"), 16)
+                .map_err(|e| format!("Invalid selector hex: {e}"))?;
+            let value = u32::from_str_radix(args[2].trim_start_matches("0x").trim_start_matches("0X"), 16)
+                .map_err(|e| format!("Invalid value hex: {e}"))?;
+            let spec = parse_optional_specifier(&args[3..]);
+            with_monitor(spec, |mon| acer::raw_bank(mon, bank, selector, value))?;
             Ok("OK".to_string())
         }
 
@@ -778,17 +864,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok(out)
         }
 
-        "rawbank" => {
-            if args.len() < 3 {
-                return Err("Usage: acer_monitor_cli rawbank <e0|e7|e9> <selector> <value> [specifier]".to_string());
-            }
-            let bank = parse_bank(&args[0])?;
-            let selector = parse_u32(&args[1])?;
-            let value = parse_u32(&args[2])?;
-            let spec = parse_optional_specifier(&args[3..]);
-            with_monitor(spec, |mon| acer::raw_bank(mon, bank, selector, value))?;
-            Ok("OK".to_string())
-        }
+
 
         "getbank" => {
             if args.len() < 2 {
@@ -1063,20 +1139,20 @@ fn parse_flag_str(args: &[String], flag: &str) -> Option<String> {
     args.get(idx + 1).cloned()
 }
 
-fn with_monitor<T, F>(spec: Option<&str>, mut f: F) -> Result<(), String>
+fn with_monitor<T, F>(spec: Option<&str>, mut f: F) -> Result<T, String>
 where
     F: FnMut(&mut crate::monitor::Monitor) -> Result<T, String>,
 {
     let mut set = MonitorSet::enumerate()?;
     if let Some("all") = spec {
+        let mut last = None;
         for mon in set.monitors_mut() {
-            f(mon)?;
+            last = Some(f(mon)?);
         }
-        Ok(())
+        last.ok_or_else(|| "No monitors found".to_string())
     } else {
         let mon = set.pick_mut_by_specifier(spec)?;
-        f(mon)?;
-        Ok(())
+        f(mon)
     }
 }
 
@@ -1107,22 +1183,22 @@ fn parse_on_off(s: &str) -> Result<bool, String> {
 fn parse_bluelight(s: &str) -> Result<u32, String> {
     match s.to_ascii_lowercase().as_str() {
         "0" | "off" | "standard" => Ok(0),
-        "50" => Ok(1),
-        "60" => Ok(2),
-        "70" => Ok(3),
-        "80" => Ok(4),
+        "1" | "50" | "50%" => Ok(1),
+        "2" | "60" | "60%" => Ok(2),
+        "3" | "70" | "70%" => Ok(3),
+        "4" | "80" | "80%" => Ok(4),
         _ => Err("Use 0/off/standard, 50, 60, 70, or 80".into()),
     }
 }
 
 fn parse_gamma(s: &str) -> Result<u32, String> {
-    match s {
-        "18" => Ok(0),
-        "20" => Ok(1),
-        "22" => Ok(2),
-        "24" => Ok(3),
-        "26" => Ok(4),
-        _ => Err("Use 18, 20, 22, 24, or 26".into()),
+    match s.trim() {
+        "1.8" | "18" => Ok(0),
+        "2.0" | "20" => Ok(1),
+        "2.2" | "22" | "default" | "standard" => Ok(2),
+        "2.4" | "24" => Ok(3),
+        "2.6" | "26" => Ok(4),
+        _ => Err("Use 1.8 (18), 2.0 (20), 2.2 (22), 2.4 (24), or 2.6 (26)".into()),
     }
 }
 
@@ -1131,14 +1207,14 @@ fn parse_color_temp(s: &str) -> Result<u32, String> {
         "warm" => Ok(0xFFFF),
         "normal" => Ok(0),
         "cool" => Ok(1),
-        "bluelight" => Ok(2),
-        "user" => Ok(3),
+        "bluelight" | "blue-light" | "blue" => Ok(2),
+        "user" | "custom" => Ok(3),
         _ => Err("Use warm, normal, cool, bluelight, or user".into()),
     }
 }
 
 fn parse_input_source(s: &str) -> Result<u32, String> {
-    match s.to_ascii_lowercase().as_str() {
+    match s.to_ascii_lowercase().replace([' ', '_', '-'], "").as_str() {
         "auto" => Ok(0x01),
         "dp" | "displayport" => Ok(0x0F),
         "hdmi1" => Ok(0x11),
