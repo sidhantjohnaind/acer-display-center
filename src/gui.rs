@@ -70,7 +70,6 @@ impl Default for CachedMonitorState {
 pub struct GuiSettings {
     pub theme: AccentTheme,
     pub unified_hdr_bridge: bool,
-    pub is_pinned: bool,
     #[serde(default)]
     pub last_state: CachedMonitorState,
 }
@@ -80,7 +79,6 @@ impl Default for GuiSettings {
         Self {
             theme: AccentTheme::CyberCyan,
             unified_hdr_bridge: true,
-            is_pinned: false,
             last_state: CachedMonitorState::default(),
         }
     }
@@ -193,6 +191,7 @@ impl AccentTheme {
 
 #[derive(Debug, Clone, Default)]
 pub struct MonitorStateUpdate {
+    pub sync_id: Option<u64>,
     pub brightness: Option<u32>,
     pub contrast: Option<u32>,
     pub volume: Option<u32>,
@@ -218,7 +217,6 @@ fn map_display_mode(dm: u32) -> &'static str {
         1 => "Standard",
         2 => "ECO Saver",
         3 => "Graphics",
-        4 => "Movie",
         5 => "Action",
         6 => "Racing",
         7 => "Sports",
@@ -242,22 +240,39 @@ fn probe_hardware_state() -> MonitorStateUpdate {
     // 1. Windows OS Native HDR state
     let is_hdr = crate::hdr::get_os_hdr();
     update.is_hdr_active = Some(is_hdr);
-    if is_hdr {
-        if let Some(sdr_b) = crate::hdr::get_sdr_white_level() {
-            update.brightness = Some(sdr_b);
-        }
-    }
 
     // 2. Direct DDC/CI Hardware registers
     if let Ok(mut set) = crate::monitor::MonitorSet::enumerate() {
         if let Some(mon) = set.monitors_mut().first_mut() {
             update.monitor_name = Some(mon.description.clone());
 
-            if !is_hdr {
-                if let Ok((b, _)) = mon.get_vcp(0x10) {
-                    update.brightness = Some(b);
-                }
+            let mut is_hardware_hdr = false;
+            if let Ok((dm, _)) = mon.get_vcp(0xE2) {
+                let preset_name = map_display_mode(dm);
+                let mon_is_hdr = dm == 11 || preset_name.eq_ignore_ascii_case("HDR") || preset_name.eq_ignore_ascii_case("HDR Game");
+                is_hardware_hdr = mon_is_hdr;
+                let active_hdr = mon_is_hdr || is_hdr;
+                update.selected_preset = Some(if active_hdr { "HDR Game".to_string() } else { preset_name.to_string() });
+                update.is_hdr_active = Some(active_hdr);
             }
+
+            let mut b_val: Option<u32> = None;
+            for _ in 0..3 {
+                if let Ok((b, _)) = mon.get_vcp(0x10) {
+                    b_val = Some(b);
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(80));
+            }
+
+            if is_hardware_hdr || is_hdr {
+                if let Some(sdr_b) = crate::hdr::get_sdr_white_level() {
+                    update.brightness = Some(sdr_b);
+                }
+            } else if let Some(b) = b_val {
+                update.brightness = Some(b);
+            }
+
             if let Ok((c, _)) = mon.get_vcp(0x12) {
                 update.contrast = Some(c);
             }
@@ -299,13 +314,6 @@ fn probe_hardware_state() -> MonitorStateUpdate {
             if let Ok((inp, _)) = mon.get_vcp(0x60) {
                 update.input = Some(map_input(inp).to_string());
             }
-            if let Ok((dm, _)) = mon.get_vcp(0xE2) {
-                let preset_name = map_display_mode(dm);
-                let mon_is_hdr = dm == 11 || preset_name.eq_ignore_ascii_case("HDR") || preset_name.eq_ignore_ascii_case("HDR Game");
-                let active_hdr = mon_is_hdr || is_hdr;
-                update.selected_preset = Some(if active_hdr { "HDR Game".to_string() } else { preset_name.to_string() });
-                update.is_hdr_active = Some(active_hdr);
-            }
             update.status = Some(format!("Synced with {}", mon.description));
         }
     }
@@ -339,7 +347,7 @@ pub struct AcerQuickSettingsApp {
     pub status_text: String,
 
     // Async worker channels
-    tx_cmd: Sender<Vec<String>>,
+    tx_cmd: Sender<(Vec<String>, Option<u64>)>,
     rx_status: Receiver<String>,
     rx_state: Receiver<MonitorStateUpdate>,
 
@@ -348,7 +356,10 @@ pub struct AcerQuickSettingsApp {
     last_c_change: Option<(Instant, u32)>,
     last_v_change: Option<(Instant, u32)>,
     last_bb_change: Option<(Instant, u32)>,
-    last_sync_instant: Option<Instant>,
+    pub is_syncing: bool,
+    sync_started_at: Option<Instant>,
+    sync_counter: u64,
+    pending_sync_id: Option<u64>,
     toast_message: Option<(String, Instant)>,
 
     // Oscillation Prevention Timestamps
@@ -394,7 +405,7 @@ impl AcerQuickSettingsApp {
         }
         _cc.egui_ctx.set_fonts(fonts);
 
-        let (tx_cmd, rx_cmd) = channel::<Vec<String>>();
+        let (tx_cmd, rx_cmd) = channel::<(Vec<String>, Option<u64>)>();
         let (tx_status, rx_status) = channel::<String>();
         let (tx_state, rx_state) = channel::<MonitorStateUpdate>();
         let (tx_report, rx_report) = channel::<(String, String)>();
@@ -405,9 +416,10 @@ impl AcerQuickSettingsApp {
         let tx_state_worker = tx_state.clone();
         let tx_report_worker = tx_report.clone();
         std::thread::spawn(move || {
-            while let Ok(args) = rx_cmd.recv() {
+            while let Ok((args, maybe_id)) = rx_cmd.recv() {
                 if args.first().map(|s| s.as_str()) == Some("refresh_state") {
-                    let update = probe_hardware_state();
+                    let mut update = probe_hardware_state();
+                    update.sync_id = maybe_id;
                     let _ = tx_state_worker.send(update);
                     let _ = tx_status_worker.send("Hardware state refreshed".into());
                     continue;
@@ -435,13 +447,24 @@ impl AcerQuickSettingsApp {
 
                         // Automatically re-probe and sync hardware state after mode changes!
                         if is_mode_change_cmd {
-                            std::thread::sleep(Duration::from_millis(250));
-                            let update = probe_hardware_state();
+                            let delay_ms = if matches!(first_arg.as_str(), "preset" | "hdr" | "reset") { 1500 } else { 150 };
+                            std::thread::sleep(Duration::from_millis(delay_ms));
+                            let mut update = probe_hardware_state();
+                            update.sync_id = maybe_id;
+                            let _ = tx_state_worker.send(update);
+                        } else if let Some(id) = maybe_id {
+                            let mut update = MonitorStateUpdate::default();
+                            update.sync_id = Some(id);
                             let _ = tx_state_worker.send(update);
                         }
                     }
                     Err(e) => {
                         let _ = tx_status_worker.send(format!("Error: {e}"));
+                        if let Some(id) = maybe_id {
+                            let mut update = MonitorStateUpdate::default();
+                            update.sync_id = Some(id);
+                            let _ = tx_state_worker.send(update);
+                        }
                     }
                 }
             }
@@ -505,7 +528,10 @@ impl AcerQuickSettingsApp {
             last_c_change: None,
             last_v_change: None,
             last_bb_change: None,
-            last_sync_instant: None,
+            is_syncing: false,
+            sync_started_at: None,
+            sync_counter: 0,
+            pending_sync_id: None,
             toast_message: None,
             last_user_b_edit: past,
             last_user_c_edit: past,
@@ -514,7 +540,7 @@ impl AcerQuickSettingsApp {
             last_user_preset_edit: past,
             created_at: Instant::now(),
             has_been_focused: false,
-            is_pinned: settings.is_pinned,
+            is_pinned: false,
             report_modal: None,
             rx_report,
         }
@@ -524,7 +550,6 @@ impl AcerQuickSettingsApp {
         let settings = GuiSettings {
             theme: self.theme,
             unified_hdr_bridge: self.unified_hdr_bridge,
-            is_pinned: self.is_pinned,
             last_state: CachedMonitorState {
                 brightness: self.brightness,
                 contrast: self.contrast,
@@ -548,22 +573,34 @@ impl AcerQuickSettingsApp {
 
     fn send_cmd(&mut self, args: &[&str]) {
         let first_arg = args.first().copied().unwrap_or_default();
-        if matches!(first_arg, "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sync") {
-            self.last_sync_instant = Some(Instant::now());
-        }
+        let is_sync_trigger = matches!(first_arg, "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sync" | "brightness" | "contrast" | "sdr");
+        let id = if is_sync_trigger {
+            self.sync_counter += 1;
+            let cur_id = self.sync_counter;
+            self.pending_sync_id = Some(cur_id);
+            self.is_syncing = true;
+            self.sync_started_at = Some(Instant::now());
+            Some(cur_id)
+        } else {
+            None
+        };
         let vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-        let _ = self.tx_cmd.send(vec);
+        let _ = self.tx_cmd.send((vec, id));
     }
 
     fn refresh_hardware(&mut self) {
-        self.last_sync_instant = Some(Instant::now());
+        self.sync_counter += 1;
+        let id = self.sync_counter;
+        self.pending_sync_id = Some(id);
+        self.is_syncing = true;
+        self.sync_started_at = Some(Instant::now());
         let past = Instant::now() - Duration::from_secs(10);
         self.last_user_b_edit = past;
         self.last_user_c_edit = past;
         self.last_user_v_edit = past;
         self.last_user_bb_edit = past;
         self.last_user_preset_edit = past;
-        let _ = self.tx_cmd.send(vec!["refresh_state".into()]);
+        let _ = self.tx_cmd.send((vec!["refresh_state".into()], Some(id)));
     }
 }
 
@@ -628,37 +665,46 @@ impl eframe::App for AcerQuickSettingsApp {
             self.report_modal = Some((title, body));
         }
 
+        // Safety timeout for sync spinner (max 6s)
+        if let Some(t) = self.sync_started_at {
+            if t.elapsed() > Duration::from_secs(6) {
+                self.is_syncing = false;
+                self.sync_started_at = None;
+            }
+        }
+
         let mut had_state_change = false;
         while let Ok(st) = self.rx_state.try_recv() {
             had_state_change = true;
+            let is_sync_reply = st.sync_id.is_some();
             if let Some(b) = st.brightness {
-                if now.duration_since(self.last_user_b_edit) > Duration::from_millis(2500) && self.last_b_change.is_none() {
+                if (is_sync_reply || now.duration_since(self.last_user_b_edit) > Duration::from_millis(600)) && self.last_b_change.is_none() {
                     self.brightness = b;
                 }
             }
             if let Some(c) = st.contrast {
-                if now.duration_since(self.last_user_c_edit) > Duration::from_millis(2500) && self.last_c_change.is_none() {
+                if (is_sync_reply || now.duration_since(self.last_user_c_edit) > Duration::from_millis(600)) && self.last_c_change.is_none() {
                     self.contrast = c;
                 }
             }
             if let Some(v) = st.volume {
-                if now.duration_since(self.last_user_v_edit) > Duration::from_millis(2500) && self.last_v_change.is_none() {
+                if (is_sync_reply || now.duration_since(self.last_user_v_edit) > Duration::from_millis(600)) && self.last_v_change.is_none() {
                     self.volume = v;
                 }
             }
             if let Some(m) = st.is_muted { self.is_muted = m; }
             if let Some(bb) = st.black_boost {
-                if now.duration_since(self.last_user_bb_edit) > Duration::from_millis(2500) && self.last_bb_change.is_none() {
+                if (is_sync_reply || now.duration_since(self.last_user_bb_edit) > Duration::from_millis(600)) && self.last_bb_change.is_none() {
                     self.black_boost = bb;
                 }
             }
             if let Some(hdr) = st.is_hdr_active {
-                if now.duration_since(self.last_user_preset_edit) > Duration::from_millis(2500) {
+                if is_sync_reply || now.duration_since(self.last_user_preset_edit) > Duration::from_millis(600) {
                     self.is_hdr_active = hdr;
                 }
             }
             if let Some(p) = st.selected_preset {
-                if now.duration_since(self.last_user_preset_edit) > Duration::from_millis(2500) {
+                if is_sync_reply || now.duration_since(self.last_user_preset_edit) > Duration::from_millis(600) {
                     self.selected_preset = p;
                 }
             }
@@ -670,6 +716,14 @@ impl eframe::App for AcerQuickSettingsApp {
             if let Some(inp) = st.input { self.selected_input = inp; }
             if let Some(name) = st.monitor_name { self.monitor_name = name; }
             if let Some(stat) = st.status { self.status_text = stat; }
+
+            // Clear is_syncing only AFTER applying the state
+            if let Some(id) = st.sync_id {
+                if self.pending_sync_id == Some(id) || self.pending_sync_id.map(|p| id >= p).unwrap_or(false) {
+                    self.is_syncing = false;
+                    self.pending_sync_id = None;
+                }
+            }
         }
 
         if had_state_change {
@@ -790,24 +844,28 @@ impl eframe::App for AcerQuickSettingsApp {
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
-                        // 3. Sync Button with Live Smooth Spinner Animation
-                        let is_syncing = self.last_sync_instant
-                            .map(|t| t.elapsed() < Duration::from_millis(1500))
-                            .unwrap_or(false);
+                        // 3. Sync Button with Live Dynamic Spinner (Runs for >= 2.2s so user sees smooth feedback)
+                        let min_sync_dur = Duration::from_millis(2200);
+                        let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
+                        if is_animating_sync {
+                            ctx.request_repaint();
+                        } else {
+                            self.sync_started_at = None;
+                        }
 
                         let (sync_rect, sync_resp) = ui.allocate_exact_size(
-                            Vec2::new(if is_syncing { 62.0 } else { 48.0 }, 22.0),
+                            Vec2::new(if is_animating_sync { 62.0 } else { 48.0 }, 22.0),
                             egui::Sense::click(),
                         );
                         let is_sync_hov = sync_resp.hovered();
-                        let sync_bg = if is_syncing {
+                        let sync_bg = if is_animating_sync {
                             Color32::from_rgba_unmultiplied(accent.r() / 6, accent.g() / 6, accent.b() / 6, 255)
                         } else if is_sync_hov {
                             Color32::from_rgb(22, 32, 48)
                         } else {
                             Color32::from_rgb(16, 24, 36)
                         };
-                        let sync_stroke = if is_syncing {
+                        let sync_stroke = if is_animating_sync {
                             Stroke::new(1.2, accent)
                         } else if is_sync_hov {
                             Stroke::new(1.0, accent)
@@ -818,7 +876,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         ui.painter().rect_filled(sync_rect, Rounding::same(4.0), sync_bg);
                         ui.painter().rect_stroke(sync_rect, Rounding::same(4.0), sync_stroke);
 
-                        if is_syncing {
+                        if is_animating_sync {
                             let angle = (ui.input(|i| i.time) * 10.0) as f32;
                             let center = sync_rect.left_center() + Vec2::new(10.0, 0.0);
                             let r = 4.0;
@@ -835,7 +893,6 @@ impl eframe::App for AcerQuickSettingsApp {
                                 egui::FontId::proportional(9.5),
                                 accent,
                             );
-                            ctx.request_repaint();
                         } else {
                             ui.painter().text(
                                 sync_rect.center(),
@@ -846,7 +903,7 @@ impl eframe::App for AcerQuickSettingsApp {
                             );
                         }
 
-                        if sync_resp.clicked() {
+                        if sync_resp.clicked() && !is_animating_sync {
                             self.refresh_hardware();
                             self.show_toast("Refreshing monitor state...");
                         }
@@ -1128,7 +1185,12 @@ impl AcerQuickSettingsApp {
             }
         }
 
-        let progress = ((*val as f32 - min as f32) / (max - min) as f32).clamp(0.0, 1.0);
+        let anim_val = if resp.dragged() {
+            *val as f32
+        } else {
+            ui.ctx().animate_value_with_time(resp.id.with("slider_anim"), *val as f32, 0.12)
+        };
+        let progress = ((anim_val - min as f32) / (max - min) as f32).clamp(0.0, 1.0);
         let knob_x = track_rect.left() + progress * track_rect.width();
         let knob_center = Pos2::new(knob_x, track_rect.center().y);
 
@@ -1477,27 +1539,26 @@ impl AcerQuickSettingsApp {
         ui.label(egui::RichText::new("🎮 Display Presets").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
-        // 3x3 Preset Grid with Clean Typography (Zero Missing Font Boxes)
+        // 4x2 Preset Grid with Clean Typography (8 Exact Hardware Presets - Movie Removed)
         let presets = [
-            ("⚔ Action", "action", 100, 50),
-            ("⚡ Standard", "standard", 80, 50),
-            ("✨ HDR Game", "hdr", 100, 50),
-            ("🌱 ECO", "eco", 20, 50),
-            ("🏁 Racing", "racing", 100, 50),
-            ("⚽ Sports", "sports", 100, 50),
-            ("🎬 Movie", "movie", 70, 55),
-            ("🎨 Graphics", "graphics", 80, 50),
-            ("👤 User", "user", 50, 50),
+            ("⚔ Action", "action"),
+            ("⚡ Standard", "standard"),
+            ("✨ HDR Game", "hdr"),
+            ("🌱 ECO", "eco"),
+            ("🏁 Racing", "racing"),
+            ("⚽ Sports", "sports"),
+            ("🎨 Graphics", "graphics"),
+            ("👤 User", "user"),
         ];
 
-        let col_w = (ui.available_width() - 8.0) / 3.0;
-        egui::Grid::new("presets_grid").num_columns(3).spacing([4.0, 4.0]).show(ui, |ui| {
-            for (i, &(label, cmd, target_b, target_c)) in presets.iter().enumerate() {
+        let col_w = (ui.available_width() - 12.0) / 4.0;
+        egui::Grid::new("presets_grid").num_columns(4).spacing([4.0, 4.0]).show(ui, |ui| {
+            for (i, &(label, cmd)) in presets.iter().enumerate() {
                 let clean_sel = self.selected_preset
-                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎬', '🎨', '👤', ' '], "")
+                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎨', '👤', ' '], "")
                     .to_ascii_lowercase();
                 let clean_label = label
-                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎬', '🎨', '👤', ' '], "")
+                    .replace(['⚔', '⚡', '✨', '🌱', '🏁', '⚽', '🎨', '👤', ' '], "")
                     .to_ascii_lowercase();
                 let is_sel = self.selected_preset.eq_ignore_ascii_case(cmd)
                     || self.selected_preset.eq_ignore_ascii_case(label)
@@ -1510,37 +1571,24 @@ impl AcerQuickSettingsApp {
                 let btn_id = egui::Id::new(format!("preset_btn_{cmd}"));
 
                 if Self::render_card_button(ui, btn_id, label, is_sel, Vec2::new(col_w, 26.0), accent).clicked() {
-                    let was_hdr = self.is_hdr_active;
                     let is_target_hdr = cmd == "hdr" || label.eq_ignore_ascii_case("HDR Game");
                     self.selected_preset = label.into();
-                    self.brightness = target_b;
-                    self.contrast = target_c;
                     self.is_hdr_active = is_target_hdr;
                     self.last_user_preset_edit = Instant::now();
-                    self.last_user_b_edit = Instant::now();
-                    self.last_user_c_edit = Instant::now();
-                    self.show_toast(format!("Applied Preset: {label} (Brightness: {target_b}%)"));
+                    self.last_b_change = None;
+                    self.last_c_change = None;
+                    self.show_toast(format!("Applied Preset: {label}"));
 
                     if self.unified_hdr_bridge {
                         // Unified HDR Bridge is ON: Change BOTH Monitor Hardware & Windows OS HDR!
                         self.send_cmd(&["preset", cmd, "--unified"]);
-                        if is_target_hdr && !was_hdr {
-                            self.send_cmd(&["hdr", "both", "on"]);
-                        } else if !is_target_hdr && was_hdr {
-                            self.send_cmd(&["hdr", "both", "off"]);
-                        }
                     } else {
                         // Unified HDR Bridge is OFF: ONLY change Monitor Hardware! Windows OS HDR untouched.
                         self.send_cmd(&["preset", cmd]);
-                        if is_target_hdr {
-                            self.send_cmd(&["hdr", "monitor", "on"]);
-                        } else if was_hdr {
-                            self.send_cmd(&["hdr", "monitor", "off"]);
-                        }
                     }
                     self.save_settings();
                 }
-                if (i + 1) % 3 == 0 { ui.end_row(); }
+                if (i + 1) % 4 == 0 { ui.end_row(); }
             }
         });
 

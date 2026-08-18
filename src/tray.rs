@@ -321,7 +321,6 @@ mod win32_tray {
         AppendMenuW(m_presets, MF_STRING, 203, to_wide(&hk.menu_item("⚽ Sports", &["preset", "sports"])).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 204, to_wide(&hk.menu_item("⚡ Standard", &["preset", "standard"])).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 205, to_wide(&hk.menu_item("🌱 ECO Saver", &["preset", "eco"])).as_ptr());
-        AppendMenuW(m_presets, MF_STRING, 206, to_wide(&hk.menu_item("🎬 Movie / Cinema", &["preset", "movie"])).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 207, to_wide(&hk.menu_item("🎨 Graphics / sRGB", &["preset", "graphics"])).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 208, to_wide(&hk.menu_item("✨ HDR Game (Hardware)", &["preset", "hdr"])).as_ptr());
         AppendMenuW(m_presets, MF_STRING, 209, to_wide(&hk.menu_item("👤 User Custom", &["preset", "user"])).as_ptr());
@@ -544,7 +543,6 @@ mod win32_tray {
             203 => run_cli(&["preset", "sports"]),
             204 => run_cli(&["preset", "standard"]),
             205 => run_cli(&["preset", "eco"]),
-            206 => run_cli(&["preset", "movie"]),
             207 => run_cli(&["preset", "graphics"]),
             208 => run_cli(&["preset", "hdr"]),
             209 => run_cli(&["preset", "user"]),
