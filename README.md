@@ -93,16 +93,23 @@ Press **<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>** or left-click the Syst
 - **Hotkeys Customizer**: Add and rebind any hotkey directly inside the UI.
 
 ### 2. Live System Tray Context Menu (`amctl tray`)
-Right-click the notification area icon for instant cascading controls showing current live state:
-- `🎮 Picture Presets (Current: Action)`
-- `☀️ Brightness (Current: 75%)`
-- `🌓 Contrast (Current: 50%)`
-- `🎯 Gaming & Esports (Off, Aim: Off)`
-- `🎨 Color & Eye Shield (Warm)`
-- `🔌 Input Source (Current: DP)`
-- `🔊 Audio (Current: 50%)`
-- `🛠️ Hardware Tools & Power` (Centered Dark Studio modals with `[ 📋 Copy ]` button)
-- `⚙️ Global Hotkeys (Toggle Enable/Disable)`
+Right-click the notification area icon for instant access to cascading hardware controls and dynamic shortcut accelerators:
+
+<p align="center">
+  <img src="assets/tray_menu.png" width="300" alt="Acer Display Center System Tray Context Menu" />
+</p>
+
+- `🚀 Open Acer Display Center` (Dynamic accelerator key binding lookup)
+- `🔄 Refresh Monitor State Now`
+- `🎮 Picture Presets` (Action, Racing, Sports, Standard, ECO, Movie, Graphics, HDR Game, User)
+- `☀️ Brightness` (100%, 75%, 50%, 25%, 10% Night Dim, 0%, +10%, -10%)
+- `🌓 Contrast` (80% down to 20%)
+- `🎯 Gaming & Esports` (AimPoint Crosshairs, Toggle FPS/Hz HUD, OverDrive Extreme/Normal/Off, Black Boost 0–10)
+- `🎨 Color & Eye Shield` (Blue Light Level 1–4, Color Temp, Gamma 1.8–2.6, Color Space sRGB/DCI-P3/Rec.709/HDR)
+- `🔌 Input Source` (DP, HDMI 1, HDMI 2, Auto Select, Next Input)
+- `🔊 Audio` (Toggle Mute, Volume 0–100%, Volume +/-10%)
+- `🛠️ Hardware Tools & Power` (Unified HDR, Standby Power Off, Power LED, Solar Scheduler, Diagnostics, Calibration Patterns)
+- `⚙️ Global Hotkeys` (Master Toggle & Quick Configurator)
 
 ---
 
