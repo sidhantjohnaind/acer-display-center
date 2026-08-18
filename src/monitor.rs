@@ -669,7 +669,7 @@ mod platform {
 #[cfg(target_os = "linux")]
 mod platform {
     use super::{apply_feature_flags, parse_vcp_codes, MonitorCapabilities};
-    use ddc::Ddc;
+    use ddc::{Ddc, DdcHost};
     use ddc_i2c::I2cDevice;
     use std::fs;
 
