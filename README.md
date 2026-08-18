@@ -75,12 +75,21 @@ curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/
 
 ### 1. Quick Access GUI Flyout (`amctl gui`)
 Press **<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd>** or left-click the System Tray icon to open the flyout:
-- **Header Controls**: `[ 📌 Pin Window ]`, `[ 🎨 Dark/Light Theme ]`, and `[ 🔄 Re-sync ]`.
-- **Top Quick Action Cards**: ECO Mode, Max Gaming, Reading Shield, Movie Cinema, and Standard.
-- **Hardware Sliders**: Smooth Brightness and Contrast adjustments with on-screen OSD feedback.
-- **Gaming & Esports**: OverDrive (`Extreme` / `Normal` / `Off`), AimPoint Crosshair (`Dot` / `Cross 1` / `Cross 2`), Refresh Rate HUD.
-- **Color & Eye Shield**: Blue Light Filter (Level 1–4), Color Temperature (Warm / Normal / Cool / BlueLight), Gamma (2.0 / 2.2 / 2.4), Color Space (sRGB / DCI-P3 / Rec.709).
-- **Hardware & Power Tools**: Unified HDR Master Switch, Physical Keylock, Energy Estimator, Diagnostic Scanner, Calibration Grid, Factory Reset.
+
+<p align="center">
+  <img src="assets/tab_display.png" width="48%" alt="Display Tab - Brightness, Contrast, Volume, Presets & Inputs" />
+  <img src="assets/tab_gaming.png" width="48%" alt="Gaming Tab - OverDrive, Black Boost, AimPoint Crosshair & Refresh Rate Counter" />
+</p>
+<p align="center">
+  <img src="assets/tab_color.png" width="48%" alt="Color Tab - Color Temp, Blue Light Shield, Gamma & Color Space" />
+  <img src="assets/tab_tools.png" width="48%" alt="Tools Tab - Unified HDR Bridge, 9 Accent Themes, Keylock, Diagnostics & Calibration" />
+</p>
+
+- **Header Controls**: `[ 📌 Pin Window ]`, `[ 🎨 9 Accent Color Themes ]`, and `[ 🔄 Re-sync ]`.
+- **Display Tab**: Smooth Brightness, Contrast, Volume & Mute sliders, 9 Hardware Picture Presets, and Active Video Input Switcher.
+- **Gaming & Esports**: Response Time OverDrive (`Extreme` / `Normal` / `Off`), Black Boost Shadow Equalizer (0–10), Hardware AimPoint Crosshairs (`Dot` / `Cross` / `Triangle`), and Refresh Rate (Hz / FPS) HUD.
+- **Color & Eye Shield**: Blue Light Filter (Level 1–4), Color Temperature (Warm / Normal / Cool / BlueLight / User), Gamma Curve (1.8 / 2.0 / 2.2 / 2.4 / 2.6), Color Space (sRGB / DCI-P3 / Rec.709 / HDR / EBU / SMPTE-C).
+- **Hardware & Power Tools**: Unified HDR Master Switch, Global Hotkeys Master Toggle, 9 UI Accent Themes, Physical OSD Keylock, Energy Estimator, Diagnostic Scanner, Calibration Patterns, and Factory Reset.
 - **Hotkeys Customizer**: Add and rebind any hotkey directly inside the UI.
 
 ### 2. Live System Tray Context Menu (`amctl tray`)
