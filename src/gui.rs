@@ -707,59 +707,16 @@ impl eframe::App for AcerQuickSettingsApp {
             .show(ctx, |ui| {
                 // Header Bar with Drag handle, Sync, Theme Cycler, Minimize, and Close
                 let header_rect = ui.horizontal(|ui| {
-                    // Logo Dot & Title
-                    let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(10.0, 10.0), egui::Sense::hover());
-                    ui.painter().circle_filled(dot_rect.center(), 4.0, accent);
+                    // Left: Logo Dot & Title
+                    let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
+                    ui.painter().circle_filled(dot_rect.center(), 3.5, accent);
                     ui.add_space(2.0);
+                    ui.label(egui::RichText::new("DISPLAY CENTER").strong().size(11.5).color(Color32::WHITE));
 
-                    ui.label(egui::RichText::new("🖥  ACER DISPLAY CENTER").strong().size(12.0).color(Color32::WHITE));
-                    ui.label(egui::RichText::new("·").size(12.0).color(Color32::from_rgb(70, 75, 90)));
-                    ui.label(egui::RichText::new("VG271U").size(11.0).color(Color32::from_rgb(148, 163, 184)));
-
-                    ui.add_space(4.0);
-                    // HDR Badge Pill in Header (Clickable Quick Toggle)
-                    let (hdr_pill_rect, hdr_pill_resp) = ui.allocate_exact_size(Vec2::new(58.0, 18.0), egui::Sense::click());
-                    let is_hdr_pill_hov = hdr_pill_resp.hovered();
-                    let (h_bg, h_stroke, h_txt, h_col) = if self.is_hdr_active {
-                        (
-                            self.theme.badge_bg(),
-                            Stroke::new(1.0, accent),
-                            "✨ HDR ON",
-                            Color32::WHITE,
-                        )
-                    } else {
-                        (
-                            if is_hdr_pill_hov { Color32::from_rgb(32, 38, 52) } else { Color32::from_rgb(20, 24, 32) },
-                            Stroke::new(1.0, if is_hdr_pill_hov { Color32::from_rgb(60, 72, 95) } else { Color32::from_rgb(38, 44, 58) }),
-                            "HDR OFF",
-                            Color32::from_rgb(148, 163, 184),
-                        )
-                    };
-                    ui.painter().rect(hdr_pill_rect, Rounding::same(4.0), h_bg, h_stroke);
-                    ui.painter().text(
-                        hdr_pill_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        h_txt,
-                        egui::FontId::proportional(9.5),
-                        h_col,
-                    );
-                    if hdr_pill_resp.clicked() {
-                        let next_hdr = !self.is_hdr_active;
-                        self.is_hdr_active = next_hdr;
-                        if next_hdr {
-                            self.selected_preset = "✨ HDR Game".into();
-                            self.show_toast("Enabling HDR (Windows + Monitor)...");
-                            self.send_cmd(&["hdr", "both", "on"]);
-                        } else {
-                            self.selected_preset = "⚡ Standard".into();
-                            self.show_toast("Disabling HDR (Standard SDR Mode)...");
-                            self.send_cmd(&["hdr", "both", "off"]);
-                        }
-                    }
-
+                    // Right: Actions Cluster (Right-to-Left)
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // Pin [ 📌 ] Button (Prevents auto-dismiss)
-                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
+                        // 1. Pin [ 📌 ] Button (Prevents auto-dismiss)
+                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(22.0, 20.0), egui::Sense::click());
                         let is_pin_hov = pin_resp.hovered();
                         let pin_bg = if self.is_pinned { theme.badge_bg() } else if is_pin_hov { Color32::from_rgb(34, 40, 56) } else { Color32::from_rgb(22, 25, 34) };
                         let pin_stroke = if self.is_pinned { Stroke::new(1.0, accent) } else { Stroke::new(1.0, Color32::from_rgb(38, 44, 58)) };
@@ -769,7 +726,7 @@ impl eframe::App for AcerQuickSettingsApp {
                             pin_rect.center(),
                             egui::Align2::CENTER_CENTER,
                             "📌",
-                            egui::FontId::proportional(10.5),
+                            egui::FontId::proportional(10.0),
                             if self.is_pinned { Color32::WHITE } else { Color32::from_rgb(148, 163, 184) },
                         );
                         if pin_resp.clicked() {
@@ -782,18 +739,18 @@ impl eframe::App for AcerQuickSettingsApp {
                             }
                         }
 
-                        // Theme Button with Active Color Circle
-                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(62.0, 22.0), egui::Sense::click());
+                        // 2. Theme Button with Active Color Circle
+                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(56.0, 20.0), egui::Sense::click());
                         let is_th_hov = th_resp.hovered();
                         let th_bg = if is_th_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) };
                         ui.painter().rect_filled(th_rect, Rounding::same(4.0), th_bg);
                         ui.painter().rect_stroke(th_rect, Rounding::same(4.0), Stroke::new(1.0, Color32::from_rgb(38, 44, 58)));
-                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 10.0, th_rect.center().y), 3.5, accent);
+                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 8.0, th_rect.center().y), 3.0, accent);
                         ui.painter().text(
-                            Pos2::new(th_rect.left() + 18.0, th_rect.center().y),
+                            Pos2::new(th_rect.left() + 16.0, th_rect.center().y),
                             egui::Align2::LEFT_CENTER,
                             "Theme",
-                            egui::FontId::proportional(10.5),
+                            egui::FontId::proportional(10.0),
                             Color32::WHITE,
                         );
                         if th_resp.clicked() {
@@ -802,33 +759,66 @@ impl eframe::App for AcerQuickSettingsApp {
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
-                        // Sync Button
+                        // 3. Sync Button
                         let is_syncing = self.last_sync_instant
                             .map(|t| t.elapsed() < Duration::from_millis(1200))
                             .unwrap_or(false);
 
-                        let sync_text = if is_syncing { "Syncing..." } else { "Sync" };
+                        let sync_text = if is_syncing { "Syncing" } else { "Sync" };
                         let sync_resp = ui.add(
-                            egui::Button::new(egui::RichText::new(sync_text).size(10.5).color(accent))
+                            egui::Button::new(egui::RichText::new(sync_text).size(10.0).color(accent))
                                 .fill(Color32::from_rgb(16, 24, 36))
                                 .stroke(Stroke::new(1.0, accent))
                                 .rounding(Rounding::same(4.0))
-                                .min_size(Vec2::new(52.0, 22.0)),
+                                .min_size(Vec2::new(44.0, 20.0)),
                         );
-
-                        if is_syncing {
-                            let angle = (ui.input(|i| i.time) * 12.0) as f32;
-                            let center = sync_resp.rect.left_center() + Vec2::new(10.0, 0.0);
-                            let r = 4.0;
-                            ui.painter().circle_stroke(center, r, Stroke::new(1.5, accent));
-                            let p1 = center + Vec2::new(angle.cos() * r, angle.sin() * r);
-                            ui.painter().circle_filled(p1, 2.0, Color32::WHITE);
-                        }
-
                         if sync_resp.clicked() {
                             self.last_sync_instant = Some(Instant::now());
-                            self.show_toast("Hardware State Synchronized");
                             self.refresh_hardware();
+                            self.show_toast("Refreshing monitor state...");
+                        }
+
+                        // 4. HDR Pill Button
+                        let (hdr_pill_rect, hdr_pill_resp) = ui.allocate_exact_size(Vec2::new(52.0, 20.0), egui::Sense::click());
+                        let is_hdr_pill_hov = hdr_pill_resp.hovered();
+                        let (h_bg, h_stroke, h_txt, h_col) = if self.is_hdr_active {
+                            (
+                                self.theme.badge_bg(),
+                                Stroke::new(1.0, accent),
+                                "✨ HDR",
+                                Color32::WHITE,
+                            )
+                        } else {
+                            (
+                                if is_hdr_pill_hov { Color32::from_rgb(32, 38, 52) } else { Color32::from_rgb(20, 24, 32) },
+                                Stroke::new(1.0, if is_hdr_pill_hov { Color32::from_rgb(60, 72, 95) } else { Color32::from_rgb(38, 44, 58) }),
+                                "SDR",
+                                Color32::from_rgb(148, 163, 184),
+                            )
+                        };
+                        ui.painter().rect(hdr_pill_rect, Rounding::same(4.0), h_bg, h_stroke);
+                        ui.painter().text(
+                            hdr_pill_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            h_txt,
+                            egui::FontId::proportional(9.5),
+                            h_col,
+                        );
+                        if hdr_pill_resp.clicked() {
+                            let next_hdr = !self.is_hdr_active;
+                            self.is_hdr_active = next_hdr;
+                            if next_hdr {
+                                self.selected_preset = "✨ HDR Game".into();
+                                self.brightness = 100;
+                                self.show_toast("Enabling HDR (Windows + Monitor)...");
+                                self.send_cmd(&["hdr", "both", "on"]);
+                            } else {
+                                self.selected_preset = "⚡ Standard".into();
+                                self.brightness = 80;
+                                self.show_toast("Disabling HDR (Standard SDR Mode)...");
+                                self.send_cmd(&["hdr", "both", "off"]);
+                                self.send_cmd(&["brightness", "80"]);
+                            }
                         }
                     });
                 }).response.rect;
@@ -1499,7 +1489,7 @@ impl AcerQuickSettingsApp {
                     self.last_user_preset_edit = Instant::now();
                     self.last_user_b_edit = Instant::now();
                     self.last_user_c_edit = Instant::now();
-                    self.show_toast(format!("Applied Preset: {label}"));
+                    self.show_toast(format!("Applied Preset: {label} (Brightness: {target_b}%)"));
 
                     if self.unified_hdr_bridge {
                         // Unified HDR Bridge is ON: Change BOTH Monitor Hardware & Windows OS HDR!
@@ -1508,6 +1498,11 @@ impl AcerQuickSettingsApp {
                             self.send_cmd(&["hdr", "both", "on"]);
                         } else if !is_target_hdr && was_hdr {
                             self.send_cmd(&["hdr", "both", "off"]);
+                            self.send_cmd(&["brightness", &target_b.to_string()]);
+                            self.send_cmd(&["contrast", &target_c.to_string()]);
+                        } else if !is_target_hdr {
+                            self.send_cmd(&["brightness", &target_b.to_string()]);
+                            self.send_cmd(&["contrast", &target_c.to_string()]);
                         }
                     } else {
                         // Unified HDR Bridge is OFF: ONLY change Monitor Hardware! Windows OS HDR untouched.
@@ -1517,8 +1512,10 @@ impl AcerQuickSettingsApp {
                         } else if was_hdr {
                             self.send_cmd(&["hdr", "monitor", "off"]);
                         }
+                        self.send_cmd(&["brightness", &target_b.to_string()]);
+                        self.send_cmd(&["contrast", &target_c.to_string()]);
                     }
-                    self.refresh_hardware();
+                    self.save_settings();
                 }
                 if (i + 1) % 3 == 0 { ui.end_row(); }
             }
@@ -1586,13 +1583,17 @@ impl AcerQuickSettingsApp {
             self.is_hdr_active = next_hdr;
             if next_hdr {
                 self.selected_preset = "✨ HDR Game".into();
+                self.brightness = 100;
                 self.show_toast("Enabling HDR (Windows OS + Display)...");
                 self.send_cmd(&["hdr", "both", "on"]);
             } else {
                 self.selected_preset = "⚡ Standard".into();
+                self.brightness = 80;
                 self.show_toast("Disabling HDR (Standard SDR Mode)...");
                 self.send_cmd(&["hdr", "both", "off"]);
+                self.send_cmd(&["brightness", "80"]);
             }
+            self.save_settings();
         }
 
         ui.add_space(6.0);
