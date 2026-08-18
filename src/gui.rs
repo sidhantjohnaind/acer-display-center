@@ -415,6 +415,7 @@ impl AcerQuickSettingsApp {
 
                 let first_arg = args.first().cloned().unwrap_or_default();
                 let is_report_cmd = matches!(first_arg.as_str(), "diag" | "energy" | "edid" | "caps" | "info" | "scan");
+                let is_mode_change_cmd = matches!(first_arg.as_str(), "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sdr" | "brightness" | "contrast");
 
                 match crate::cli::dispatch_command(args) {
                     Ok(output) => {
@@ -431,6 +432,13 @@ impl AcerQuickSettingsApp {
                             let _ = tx_report_worker.send((title.into(), output));
                         }
                         let _ = tx_status_worker.send("OK".into());
+
+                        // Automatically re-probe and sync hardware state after mode changes!
+                        if is_mode_change_cmd {
+                            std::thread::sleep(Duration::from_millis(250));
+                            let update = probe_hardware_state();
+                            let _ = tx_state_worker.send(update);
+                        }
                     }
                     Err(e) => {
                         let _ = tx_status_worker.send(format!("Error: {e}"));
@@ -543,7 +551,13 @@ impl AcerQuickSettingsApp {
         let _ = self.tx_cmd.send(vec);
     }
 
-    fn refresh_hardware(&self) {
+    fn refresh_hardware(&mut self) {
+        let past = Instant::now() - Duration::from_secs(10);
+        self.last_user_b_edit = past;
+        self.last_user_c_edit = past;
+        self.last_user_v_edit = past;
+        self.last_user_bb_edit = past;
+        self.last_user_preset_edit = past;
         let _ = self.tx_cmd.send(vec!["refresh_state".into()]);
     }
 }
@@ -1485,6 +1499,7 @@ impl AcerQuickSettingsApp {
                         self.send_cmd(&["contrast", &target_c.to_string()]);
                     }
                     self.save_settings();
+                    self.refresh_hardware();
                 }
                 if (i + 1) % 3 == 0 { ui.end_row(); }
             }
@@ -1563,6 +1578,7 @@ impl AcerQuickSettingsApp {
                 self.send_cmd(&["brightness", "80"]);
             }
             self.save_settings();
+            self.refresh_hardware();
         }
 
         ui.add_space(6.0);
