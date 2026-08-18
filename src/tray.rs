@@ -457,17 +457,6 @@ mod win32_tray {
         AppendMenuW(m_tools, MF_STRING, 909, to_wide(&hk.menu_item("🌙 Turn Display Off (Standby DDC/CI)", &["power", "off"])).as_ptr());
         AppendMenuW(hmenu, MF_POPUP, m_tools as usize, to_wide("🛠️ Hardware Tools & Power").as_ptr());
 
-        // 10. Display Calibration & Test Patterns Submenu
-        let m_patterns = CreatePopupMenu();
-        AppendMenuW(m_patterns, MF_STRING, 951, to_wide("📐 Alignment & Geometry Grid").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 952, to_wide("🌈 Full RGB Spectrum Gradient").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 953, to_wide("⬜ Pure White (Dead Pixel Check)").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 954, to_wide("⬛ Pure Black (Backlight Bleed Check)").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 955, to_wide("🟥 Pure Red Color Pattern").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 956, to_wide("🟩 Pure Green Color Pattern").as_ptr());
-        AppendMenuW(m_patterns, MF_STRING, 957, to_wide("🟦 Pure Blue Color Pattern").as_ptr());
-        AppendMenuW(hmenu, MF_POPUP, m_patterns as usize, to_wide("📐 Calibration & Test Patterns").as_ptr());
-
         AppendMenuW(hmenu, MF_SEPARATOR, 0, std::ptr::null());
 
         // Global Hotkeys Master Toggle & Config
@@ -671,14 +660,6 @@ mod win32_tray {
             912 => run_cli(&["solar"]),
             913 => run_cli(&["idle-dimmer", "--idle-secs", "300", "--dim-to", "10"]),
 
-            // Patterns
-            951 => run_cli(&["test-pattern", "grid"]),
-            952 => run_cli(&["test-pattern", "rgb"]),
-            953 => run_cli(&["test-pattern", "white"]),
-            954 => run_cli(&["test-pattern", "black"]),
-            955 => run_cli(&["test-pattern", "red"]),
-            956 => run_cli(&["test-pattern", "green"]),
-            957 => run_cli(&["test-pattern", "blue"]),
 
             999 => {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);

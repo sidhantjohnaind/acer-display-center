@@ -456,15 +456,25 @@ impl AcerQuickSettingsApp {
 
         let past = Instant::now() - Duration::from_secs(10);
         let settings = GuiSettings::load();
+        let initial_brightness = if is_hdr {
+            crate::hdr::get_sdr_white_level().unwrap_or(settings.last_state.brightness)
+        } else {
+            settings.last_state.brightness
+        };
+        let initial_preset = if is_hdr {
+            "✨ HDR Game".to_string()
+        } else {
+            settings.last_state.selected_preset
+        };
         Self {
             selected_tab: Tab::Display,
             theme: settings.theme,
-            brightness: settings.last_state.brightness,
+            brightness: initial_brightness,
             contrast: settings.last_state.contrast,
             volume: settings.last_state.volume,
             is_muted: settings.last_state.is_muted,
             black_boost: settings.last_state.black_boost,
-            selected_preset: settings.last_state.selected_preset,
+            selected_preset: initial_preset,
             is_hdr_active: is_hdr,
             unified_hdr_bridge: settings.unified_hdr_bridge,
             hotkeys_enabled: true,
@@ -705,18 +715,20 @@ impl eframe::App for AcerQuickSettingsApp {
                     .inner_margin(Margin::symmetric(14.0, 12.0)),
             )
             .show(ctx, |ui| {
-                // Header Bar with Drag handle, Sync, Theme Cycler, Minimize, and Close
+                // Header Bar with Drag handle, Sync, Theme Cycler, and Pin
                 let header_rect = ui.horizontal(|ui| {
                     // Left: Logo Dot & Title
                     let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
                     ui.painter().circle_filled(dot_rect.center(), 3.5, accent);
                     ui.add_space(2.0);
-                    ui.label(egui::RichText::new("DISPLAY CENTER").strong().size(11.5).color(Color32::WHITE));
+                    ui.label(egui::RichText::new("ACER DISPLAY CENTER").strong().size(11.5).color(Color32::WHITE));
+                    ui.label(egui::RichText::new("·").size(11.0).color(Color32::from_rgb(70, 75, 90)));
+                    ui.label(egui::RichText::new("VG271U").size(10.5).color(Color32::from_rgb(148, 163, 184)));
 
                     // Right: Actions Cluster (Right-to-Left)
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // 1. Pin [ 📌 ] Button (Prevents auto-dismiss)
-                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(22.0, 20.0), egui::Sense::click());
+                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
                         let is_pin_hov = pin_resp.hovered();
                         let pin_bg = if self.is_pinned { theme.badge_bg() } else if is_pin_hov { Color32::from_rgb(34, 40, 56) } else { Color32::from_rgb(22, 25, 34) };
                         let pin_stroke = if self.is_pinned { Stroke::new(1.0, accent) } else { Stroke::new(1.0, Color32::from_rgb(38, 44, 58)) };
@@ -726,7 +738,7 @@ impl eframe::App for AcerQuickSettingsApp {
                             pin_rect.center(),
                             egui::Align2::CENTER_CENTER,
                             "📌",
-                            egui::FontId::proportional(10.0),
+                            egui::FontId::proportional(10.5),
                             if self.is_pinned { Color32::WHITE } else { Color32::from_rgb(148, 163, 184) },
                         );
                         if pin_resp.clicked() {
@@ -740,14 +752,14 @@ impl eframe::App for AcerQuickSettingsApp {
                         }
 
                         // 2. Theme Button with Active Color Circle
-                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(56.0, 20.0), egui::Sense::click());
+                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(60.0, 22.0), egui::Sense::click());
                         let is_th_hov = th_resp.hovered();
                         let th_bg = if is_th_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) };
                         ui.painter().rect_filled(th_rect, Rounding::same(4.0), th_bg);
                         ui.painter().rect_stroke(th_rect, Rounding::same(4.0), Stroke::new(1.0, Color32::from_rgb(38, 44, 58)));
-                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 8.0, th_rect.center().y), 3.0, accent);
+                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 9.0, th_rect.center().y), 3.0, accent);
                         ui.painter().text(
-                            Pos2::new(th_rect.left() + 16.0, th_rect.center().y),
+                            Pos2::new(th_rect.left() + 17.0, th_rect.center().y),
                             egui::Align2::LEFT_CENTER,
                             "Theme",
                             egui::FontId::proportional(10.0),
@@ -764,61 +776,18 @@ impl eframe::App for AcerQuickSettingsApp {
                             .map(|t| t.elapsed() < Duration::from_millis(1200))
                             .unwrap_or(false);
 
-                        let sync_text = if is_syncing { "Syncing" } else { "Sync" };
+                        let sync_text = if is_syncing { "Syncing..." } else { "Sync" };
                         let sync_resp = ui.add(
                             egui::Button::new(egui::RichText::new(sync_text).size(10.0).color(accent))
                                 .fill(Color32::from_rgb(16, 24, 36))
                                 .stroke(Stroke::new(1.0, accent))
                                 .rounding(Rounding::same(4.0))
-                                .min_size(Vec2::new(44.0, 20.0)),
+                                .min_size(Vec2::new(48.0, 22.0)),
                         );
                         if sync_resp.clicked() {
                             self.last_sync_instant = Some(Instant::now());
                             self.refresh_hardware();
                             self.show_toast("Refreshing monitor state...");
-                        }
-
-                        // 4. HDR Pill Button
-                        let (hdr_pill_rect, hdr_pill_resp) = ui.allocate_exact_size(Vec2::new(52.0, 20.0), egui::Sense::click());
-                        let is_hdr_pill_hov = hdr_pill_resp.hovered();
-                        let (h_bg, h_stroke, h_txt, h_col) = if self.is_hdr_active {
-                            (
-                                self.theme.badge_bg(),
-                                Stroke::new(1.0, accent),
-                                "✨ HDR",
-                                Color32::WHITE,
-                            )
-                        } else {
-                            (
-                                if is_hdr_pill_hov { Color32::from_rgb(32, 38, 52) } else { Color32::from_rgb(20, 24, 32) },
-                                Stroke::new(1.0, if is_hdr_pill_hov { Color32::from_rgb(60, 72, 95) } else { Color32::from_rgb(38, 44, 58) }),
-                                "SDR",
-                                Color32::from_rgb(148, 163, 184),
-                            )
-                        };
-                        ui.painter().rect(hdr_pill_rect, Rounding::same(4.0), h_bg, h_stroke);
-                        ui.painter().text(
-                            hdr_pill_rect.center(),
-                            egui::Align2::CENTER_CENTER,
-                            h_txt,
-                            egui::FontId::proportional(9.5),
-                            h_col,
-                        );
-                        if hdr_pill_resp.clicked() {
-                            let next_hdr = !self.is_hdr_active;
-                            self.is_hdr_active = next_hdr;
-                            if next_hdr {
-                                self.selected_preset = "✨ HDR Game".into();
-                                self.brightness = 100;
-                                self.show_toast("Enabling HDR (Windows + Monitor)...");
-                                self.send_cmd(&["hdr", "both", "on"]);
-                            } else {
-                                self.selected_preset = "⚡ Standard".into();
-                                self.brightness = 80;
-                                self.show_toast("Disabling HDR (Standard SDR Mode)...");
-                                self.send_cmd(&["hdr", "both", "off"]);
-                                self.send_cmd(&["brightness", "80"]);
-                            }
                         }
                     });
                 }).response.rect;
@@ -1879,35 +1848,26 @@ impl AcerQuickSettingsApp {
         });
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("📊  Diagnostics & Reports").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+        ui.label(egui::RichText::new("📊  Diagnostics & Factory Control").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
         ui.add_space(2.0);
 
+        let tri_w = (ui.available_width() - 8.0) / 3.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let diag_id = egui::Id::new("tool_diag");
-            if Self::render_card_button(ui, diag_id, "💻 Diagnostic", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, diag_id, "💻 Diag", false, Vec2::new(tri_w, 25.0), accent).clicked() {
                 self.show_toast("Querying Diagnostics...");
                 self.send_cmd(&["diag"]);
             }
 
             let nrg_id = egui::Id::new("tool_nrg");
-            if Self::render_card_button(ui, nrg_id, "⚡ Energy Info", false, Vec2::new(half_w, 25.0), accent).clicked() {
+            if Self::render_card_button(ui, nrg_id, "⚡ Energy", false, Vec2::new(tri_w, 25.0), accent).clicked() {
                 self.show_toast("Calculating Energy...");
                 self.send_cmd(&["energy"]);
             }
-        });
-
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            let grid_id = egui::Id::new("tool_pat_grid");
-            if Self::render_card_button(ui, grid_id, "📏 Grid Pattern", false, Vec2::new(half_w, 25.0), accent).clicked() {
-                self.show_toast("Rendering Calibration Grid Pattern");
-                self.send_cmd(&["test-pattern", "grid"]);
-            }
 
             let reset_id = egui::Id::new("tool_reset");
-            if Self::render_card_button(ui, reset_id, "⚠ Factory Reset", false, Vec2::new(half_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
+            if Self::render_card_button(ui, reset_id, "⚠ Reset", false, Vec2::new(tri_w, 25.0), Color32::from_rgb(239, 68, 68)).clicked() {
                 self.show_toast("Monitor Reset to Defaults");
                 self.send_cmd(&["reset"]);
             }
