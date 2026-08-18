@@ -1036,7 +1036,7 @@ impl AcerQuickSettingsApp {
         painter.text(
             Pos2::new(rect.left() + 12.0, rect.top() + 15.0),
             egui::Align2::LEFT_CENTER,
-            "⌨  Global Hotkeys (Ctrl+Alt+M/H/Up/Down/E)",
+            "⌨  Global Hotkeys & Shortcuts",
             egui::FontId::proportional(11.5),
             Color32::WHITE,
         );
@@ -1087,7 +1087,7 @@ impl AcerQuickSettingsApp {
             self.hotkeys_enabled = !self.hotkeys_enabled;
             self.send_cmd(&["hotkeys", if self.hotkeys_enabled { "on" } else { "off" }]);
             if self.hotkeys_enabled {
-                self.show_toast("Global Hotkeys Enabled (Ctrl+Alt+M/H/Up/Down/E)");
+                self.show_toast("Global Hotkeys Enabled");
             } else {
                 self.show_toast("Global Hotkeys Disabled");
             }

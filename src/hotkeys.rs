@@ -146,6 +146,32 @@ impl HotkeyConfig {
         let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
         std::fs::write(&path, json).map_err(|e| e.to_string())
     }
+
+    pub fn find_shortcut_for_command(&self, cmd: &[&str]) -> Option<String> {
+        if !self.enabled {
+            return None;
+        }
+        for binding in &self.bindings {
+            let matches = binding.command.len() == cmd.len()
+                && binding
+                    .command
+                    .iter()
+                    .zip(cmd.iter())
+                    .all(|(a, b)| a.eq_ignore_ascii_case(b));
+            if matches {
+                return Some(binding.to_display_string());
+            }
+        }
+        None
+    }
+
+    pub fn menu_item(&self, text: &str, cmd: &[&str]) -> String {
+        if let Some(sc) = self.find_shortcut_for_command(cmd) {
+            format!("{text}\t{sc}")
+        } else {
+            text.to_string()
+        }
+    }
 }
 
 impl HotkeyBinding {
