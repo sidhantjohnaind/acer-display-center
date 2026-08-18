@@ -15,10 +15,10 @@ jobs:
   build-windows:
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-pc-windows-msvc
-          - aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
 
@@ -36,13 +36,8 @@ jobs:
           mkdir -p dist
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl-${{ matrix.target }}.exe"
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/acer_monitor_cli-${{ matrix.target }}.exe"
-          if ("${{ matrix.target }}" -eq "x86_64-pc-windows-msvc") {
-            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl.exe"
-            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/acer_monitor_cli.exe"
-          }
-          if ("${{ matrix.target }}" -eq "aarch64-pc-windows-msvc") {
-            Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl-arm64.exe"
-          }
+          Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/amctl.exe"
+          Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist/acer_monitor_cli.exe"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -53,11 +48,10 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-          - riscv64gc-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
 
@@ -67,16 +61,9 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install Linux GUI Dependencies
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev libxkbcommon-dev libfontconfig1-dev
-
-      - name: Install Cross-compilation tools
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
-        uses: taiki-e/setup-cross-toolchain-action@v1
-        with:
-          target: ${{ matrix.target }}
 
       - name: Build Binary
         run: cargo build --release --target ${{ matrix.target }}
@@ -85,16 +72,8 @@ jobs:
         run: |
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-${{ matrix.target }}"
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
-            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-x86_64"
-            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl"
-          fi
-          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-arm64"
-          fi
-          if [ "${{ matrix.target }}" = "riscv64gc-unknown-linux-gnu" ]; then
-            cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-riscv64"
-          fi
+          cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl-linux-x86_64"
+          cp "target/${{ matrix.target }}/release/acer_monitor_cli" "dist/amctl"
           chmod +x dist/*
 
       - name: Upload Artifact
@@ -106,7 +85,7 @@ jobs:
   create-release:
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: always() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v4
 
