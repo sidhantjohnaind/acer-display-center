@@ -2102,12 +2102,12 @@ fn get_tray_popup_pos(width: f32, height: f32) -> Option<Pos2> {
             };
             let scale = (dpi_x / 96.0).max(1.0);
 
-            // Convert physical work area to egui logical points
+            // Convert physical work area to egui logical points (flush with bottom-right)
             let logical_right = (work_area.right as f32) / scale;
             let logical_bottom = (work_area.bottom as f32) / scale;
 
-            let x = (logical_right - width - 14.0).max(0.0);
-            let y = (logical_bottom - height - 14.0).max(0.0);
+            let x = (logical_right - width).max(0.0);
+            let y = (logical_bottom - height).max(0.0);
             Some(Pos2::new(x, y))
         } else {
             None
