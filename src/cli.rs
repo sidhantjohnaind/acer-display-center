@@ -306,7 +306,25 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             Ok(out)
         }
 
-
+        "sdr" | "sdr-brightness" | "sdr-white-level" => {
+            if args.is_empty() {
+                if let Some(cur) = crate::hdr::get_sdr_white_level() {
+                    let nits = 80.0 + (cur as f32 / 100.0 * 400.0);
+                    return Ok(format!("Windows SDR Content Brightness: {cur}% (~{nits:.0} nits)"));
+                } else {
+                    return Err("Failed to query Windows SDR Content Brightness (HDR may be disabled).".to_string());
+                }
+            }
+            let val = parse_u32(&args[0])?;
+            let show_osd = args.iter().any(|a| a == "--osd");
+            crate::hdr::set_sdr_white_level(val)?;
+            let clamped = val.min(100);
+            let nits = 80.0 + (clamped as f32 / 100.0 * 400.0);
+            if show_osd {
+                show_osd_banner("SDR Brightness", clamped, 100);
+            }
+            Ok(format!("Windows SDR Content Brightness set to {clamped}% (~{nits:.0} nits)."))
+        }
 
         "server" => {
             server::run_server()?;

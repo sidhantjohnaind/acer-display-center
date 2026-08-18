@@ -240,15 +240,23 @@ fn probe_hardware_state() -> MonitorStateUpdate {
     let mut update = MonitorStateUpdate::default();
 
     // 1. Windows OS Native HDR state
-    update.is_hdr_active = Some(crate::hdr::get_os_hdr());
+    let is_hdr = crate::hdr::get_os_hdr();
+    update.is_hdr_active = Some(is_hdr);
+    if is_hdr {
+        if let Some(sdr_b) = crate::hdr::get_sdr_white_level() {
+            update.brightness = Some(sdr_b);
+        }
+    }
 
     // 2. Direct DDC/CI Hardware registers
     if let Ok(mut set) = crate::monitor::MonitorSet::enumerate() {
         if let Some(mon) = set.monitors_mut().first_mut() {
             update.monitor_name = Some(mon.description.clone());
 
-            if let Ok((b, _)) = mon.get_vcp(0x10) {
-                update.brightness = Some(b);
+            if !is_hdr {
+                if let Ok((b, _)) = mon.get_vcp(0x10) {
+                    update.brightness = Some(b);
+                }
             }
             if let Ok((c, _)) = mon.get_vcp(0x12) {
                 update.contrast = Some(c);
@@ -641,7 +649,11 @@ impl eframe::App for AcerQuickSettingsApp {
         // Debounced Sliders
         if let Some((time, val)) = self.last_b_change {
             if now.duration_since(time) >= Duration::from_millis(80) {
-                self.send_cmd(&["brightness", &val.to_string()]);
+                if self.is_hdr_active {
+                    self.send_cmd(&["sdr", &val.to_string()]);
+                } else {
+                    self.send_cmd(&["brightness", &val.to_string()]);
+                }
                 self.last_b_change = None;
                 self.save_settings();
             }
@@ -1320,9 +1332,14 @@ impl AcerQuickSettingsApp {
     }
 
     fn render_display_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
+        let b_title = if self.is_hdr_active {
+            "☀ SDR Brightness (HDR)"
+        } else {
+            "☀ Brightness"
+        };
         let mut b_val = self.brightness;
         let mut b_change = self.last_b_change;
-        if self.render_slider_card(ui, "☀ Brightness", &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
+        if self.render_slider_card(ui, b_title, &mut b_val, 100, "%", &[0, 25, 50, 75, 100], &mut b_change, accent) {
             self.last_user_b_edit = Instant::now();
         }
         self.brightness = b_val;

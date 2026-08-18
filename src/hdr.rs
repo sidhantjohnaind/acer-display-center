@@ -134,9 +134,148 @@ pub fn get_os_hdr() -> bool {
     false
 }
 
+#[cfg(windows)]
+pub fn get_sdr_white_level() -> Option<u32> {
+    use windows::Win32::Devices::Display::{
+        DisplayConfigGetDeviceInfo,
+        GetDisplayConfigBufferSizes,
+        DISPLAYCONFIG_DEVICE_INFO_HEADER,
+        DISPLAYCONFIG_PATH_INFO,
+        QDC_ONLY_ACTIVE_PATHS,
+        DISPLAYCONFIG_MODE_INFO,
+        QueryDisplayConfig,
+    };
+
+    const DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL: i32 = 11;
+
+    #[repr(C)]
+    struct DisplayConfigSdrWhiteLevel {
+        header: DISPLAYCONFIG_DEVICE_INFO_HEADER,
+        sdr_white_level: u32,
+    }
+
+    unsafe {
+        let mut path_count: u32 = 0;
+        let mut mode_count: u32 = 0;
+        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count).0 != 0 {
+            return None;
+        }
+
+        let mut paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_count as usize];
+        let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
+
+        if QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            &mut path_count,
+            paths.as_mut_ptr(),
+            &mut mode_count,
+            modes.as_mut_ptr(),
+            None,
+        ).0 != 0 {
+            return None;
+        }
+
+        for path in &paths {
+            let mut info = DisplayConfigSdrWhiteLevel {
+                header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
+                    r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL),
+                    size: std::mem::size_of::<DisplayConfigSdrWhiteLevel>() as u32,
+                    adapterId: path.targetInfo.adapterId,
+                    id: path.targetInfo.id,
+                },
+                sdr_white_level: 0,
+            };
+
+            if DisplayConfigGetDeviceInfo(&mut info.header) == 0 {
+                let raw = info.sdr_white_level;
+                let pct = if raw >= 1000 {
+                    ((raw - 1000) as f32 / (6000 - 1000) as f32 * 100.0).round() as u32
+                } else {
+                    0
+                };
+                return Some(pct.min(100));
+            }
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+pub fn set_sdr_white_level(percent: u32) -> Result<(), String> {
+    use windows::Win32::Devices::Display::{
+        DisplayConfigSetDeviceInfo,
+        GetDisplayConfigBufferSizes,
+        DISPLAYCONFIG_DEVICE_INFO_HEADER,
+        DISPLAYCONFIG_PATH_INFO,
+        QDC_ONLY_ACTIVE_PATHS,
+        DISPLAYCONFIG_MODE_INFO,
+        QueryDisplayConfig,
+    };
+
+    const DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL: i32 = 17;
+
+    #[repr(C)]
+    struct DisplayConfigSdrWhiteLevel {
+        header: DISPLAYCONFIG_DEVICE_INFO_HEADER,
+        sdr_white_level: u32,
+    }
+
+    let pct = percent.min(100);
+    let raw = 1000 + (pct as f32 / 100.0 * 5000.0) as u32;
+
+    unsafe {
+        let mut path_count: u32 = 0;
+        let mut mode_count: u32 = 0;
+        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count).0 != 0 {
+            return Err("Failed to get display config buffer sizes".into());
+        }
+
+        let mut paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_count as usize];
+        let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
+
+        if QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            &mut path_count,
+            paths.as_mut_ptr(),
+            &mut mode_count,
+            modes.as_mut_ptr(),
+            None,
+        ).0 != 0 {
+            return Err("Failed to query display config".into());
+        }
+
+        for path in &paths {
+            let mut req = DisplayConfigSdrWhiteLevel {
+                header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
+                    r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL),
+                    size: std::mem::size_of::<DisplayConfigSdrWhiteLevel>() as u32,
+                    adapterId: path.targetInfo.adapterId,
+                    id: path.targetInfo.id,
+                },
+                sdr_white_level: raw,
+            };
+            let res = DisplayConfigSetDeviceInfo(&mut req.header);
+            if res != 0 {
+                return Err(format!("DisplayConfigSetDeviceInfo error code: {}", res));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(not(windows))]
 pub fn get_os_hdr() -> bool {
     false
+}
+
+#[cfg(not(windows))]
+pub fn get_sdr_white_level() -> Option<u32> {
+    None
+}
+
+#[cfg(not(windows))]
+pub fn set_sdr_white_level(_percent: u32) -> Result<(), String> {
+    Err("SDR White Level control is only supported on Windows 10/11 HDR".into())
 }
 
 #[cfg(not(windows))]
