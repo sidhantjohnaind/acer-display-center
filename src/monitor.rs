@@ -426,6 +426,10 @@ mod platform {
     use super::{apply_feature_flags, parse_vcp_codes, MonitorCapabilities};
     use crate::ddc::*;
     use std::ptr;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    static DDC_MUTEX: Mutex<()> = Mutex::new(());
 
     fn last_error() -> String {
         unsafe { format!("Win32 error {}", GetLastError()) }
@@ -450,21 +454,25 @@ mod platform {
 
     pub struct MonitorSet {
         monitors: Vec<Monitor>,
-        raw_handles: Vec<PHYSICAL_MONITOR>,
+        handle_groups: Vec<Vec<PHYSICAL_MONITOR>>,
     }
 
     impl Monitor {
         pub fn set_vcp(&mut self, code: u8, value: u32) -> Result<(), String> {
+            let _guard = DDC_MUTEX.lock().map_err(|e| format!("DDC lock error: {e}"))?;
             unsafe {
                 if SetVCPFeature(self.hphysical, code, value) == 0 {
                     Err(format!("SetVCPFeature(0x{code:02X}, {value}) failed: {}", last_error()))
                 } else {
+                    // Small pacing delay to prevent monitor microcontroller buffer overflow
+                    std::thread::sleep(Duration::from_millis(30));
                     Ok(())
                 }
             }
         }
 
         pub fn get_vcp(&mut self, code: u8) -> Result<(u32, u32), String> {
+            let _guard = DDC_MUTEX.lock().map_err(|e| format!("DDC lock error: {e}"))?;
             unsafe {
                 let mut vct = 0u32;
                 let mut current = 0u32;
@@ -476,23 +484,24 @@ mod platform {
                 }
             }
         }
+
         pub fn probe_e0(&mut self, selector: u32) -> bool {
             self.set_vcp(0xE0, selector).is_ok() &&
             self.get_vcp(0xE1).is_ok()
         }
 
-    
         pub fn probe_e7(&mut self, selector: u32) -> bool {
             self.set_vcp(0xE7, selector).is_ok() &&
             self.get_vcp(0xE8).is_ok()
         }
 
-    
         pub fn probe_e9(&mut self, selector: u32) -> bool {
             self.set_vcp(0xE9, selector).is_ok() &&
             self.get_vcp(0xEA).is_ok()
         }
+
         pub fn capabilities_string(&mut self) -> Result<String, String> {
+            let _guard = DDC_MUTEX.lock().map_err(|e| format!("DDC lock error: {e}"))?;
             unsafe {
                 let mut len = 0u32;
                 if GetCapabilitiesStringLength(self.hphysical, &mut len) == 0 {
@@ -563,7 +572,7 @@ mod platform {
             }
 
             let mut monitors = Vec::new();
-            let mut raw_handles = Vec::new();
+            let mut handle_groups = Vec::new();
 
             for hmonitor in hmonitors {
                 unsafe {
@@ -585,14 +594,14 @@ mod platform {
                             capabilities: MonitorCapabilities::default(),
                         });
                     }
-                    raw_handles.extend_from_slice(&phys);
+                    handle_groups.push(phys);
                 }
             }
 
             if monitors.is_empty() {
                 Err("No DDC/CI monitors found".to_string())
             } else {
-                Ok(Self { monitors, raw_handles })
+                Ok(Self { monitors, handle_groups })
             }
         }
 
@@ -657,9 +666,12 @@ mod platform {
 
     impl Drop for MonitorSet {
         fn drop(&mut self) {
+            let _guard = DDC_MUTEX.lock();
             unsafe {
-                if !self.raw_handles.is_empty() {
-                    let _ = DestroyPhysicalMonitors(self.raw_handles.len() as u32, self.raw_handles.as_mut_ptr());
+                for mut group in self.handle_groups.drain(..) {
+                    if !group.is_empty() {
+                        let _ = DestroyPhysicalMonitors(group.len() as u32, group.as_mut_ptr());
+                    }
                 }
             }
         }

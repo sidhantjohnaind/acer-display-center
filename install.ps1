@@ -11,10 +11,11 @@ if (-not (Test-Path $InstallDir)) {
 
 $ExeTarget = Join-Path $InstallDir "amctl.exe"
 $LegacyExeTarget = Join-Path $InstallDir "acer_monitor_cli.exe"
+$GuiExeTarget = Join-Path $InstallDir "acer_display_center.exe"
 $IcoTarget = Join-Path $InstallDir "app.ico"
 
 # Stop any running instances before updating
-Stop-Process -Name amctl,acer_monitor_cli -Force -ErrorAction SilentlyContinue
+Stop-Process -Name amctl,acer_monitor_cli,acer_display_center -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 300
 
 # Find local build or download from GitHub release
@@ -24,17 +25,13 @@ if (-not $ScriptDir) { $ScriptDir = (Get-Location).Path }
 
 $LocalCandidates = @(
     (Join-Path $ScriptDir "target\release\acer_monitor_cli.exe"),
-    (Join-Path $ScriptDir "target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe"),
-    (Join-Path $ScriptDir "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe"),
+    (Join-Path $ScriptDir "target\release\amctl.exe"),
     "target\release\acer_monitor_cli.exe",
-    "target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe",
-    "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe",
-    "C:\rust-target\release\acer_monitor_cli.exe",
-    "C:\rust-target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe"
+    "target\release\amctl.exe"
 )
 if ($env:CARGO_TARGET_DIR) {
     $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "release\acer_monitor_cli.exe")
-    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "x86_64-pc-windows-msvc\release\acer_monitor_cli.exe")
+    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "release\amctl.exe")
 }
 
 $ExistingCandidates = @($LocalCandidates | Where-Object { Test-Path $_ } | Get-Item | Sort-Object LastWriteTime -Descending)
@@ -42,31 +39,57 @@ $ExistingCandidates = @($LocalCandidates | Where-Object { Test-Path $_ } | Get-I
 $Installed = $false
 if ($ExistingCandidates.Count -gt 0) {
     $cand = $ExistingCandidates[0].FullName
+    $candDir = Split-Path -Parent $cand
+    $guiCand = Join-Path $candDir "acer_display_center.exe"
+
     Copy-Item -Path $cand -Destination $ExeTarget -Force
     Copy-Item -Path $cand -Destination $LegacyExeTarget -Force
+    if (Test-Path $guiCand) {
+        Copy-Item -Path $guiCand -Destination $GuiExeTarget -Force
+    } else {
+        Copy-Item -Path $cand -Destination $GuiExeTarget -Force
+    }
     $Installed = $true
     Write-Host "[+] Installed newest local release binary from $cand." -ForegroundColor Green
 }
 
 if (-not $Installed) {
-    Write-Host "[*] Downloading latest standalone release binary from GitHub..." -ForegroundColor Yellow
-    $DownloadUrl = "https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/amctl-x86_64-pc-windows-msvc.exe"
+    Write-Host "[*] Downloading latest standalone release binaries from GitHub..." -ForegroundColor Yellow
+    $BaseUrl = "https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download"
+    $RawUrl = "https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExeTarget -UseBasicParsing
+        Invoke-WebRequest -Uri "$BaseUrl/amctl-x86_64-pc-windows-msvc.exe" -OutFile $ExeTarget -UseBasicParsing
         Copy-Item -Path $ExeTarget -Destination $LegacyExeTarget -Force
-        Write-Host "[+] Downloaded binary successfully." -ForegroundColor Green
+        
+        try {
+            Invoke-WebRequest -Uri "$BaseUrl/acer_display_center-x86_64-pc-windows-msvc.exe" -OutFile $GuiExeTarget -UseBasicParsing
+        } catch {
+            Copy-Item -Path $ExeTarget -Destination $GuiExeTarget -Force
+        }
+
+        Write-Host "[+] Downloaded binaries successfully." -ForegroundColor Green
     } catch {
         Write-Host "[!] Could not download pre-built binary. Building locally with Cargo..." -ForegroundColor Yellow
         cargo build --release
         Copy-Item -Path "target\release\acer_monitor_cli.exe" -Destination $ExeTarget -Force
         Copy-Item -Path "target\release\acer_monitor_cli.exe" -Destination $LegacyExeTarget -Force
+        if (Test-Path "target\release\acer_display_center.exe") {
+            Copy-Item -Path "target\release\acer_display_center.exe" -Destination $GuiExeTarget -Force
+        } else {
+            Copy-Item -Path $ExeTarget -Destination $GuiExeTarget -Force
+        }
     }
 }
 
 # Install App Icon
 if (Test-Path "app.ico") {
     Copy-Item -Path "app.ico" -Destination $IcoTarget -Force
+} else {
+    try {
+        $RawUrl = "https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main"
+        Invoke-WebRequest -Uri "$RawUrl/app.ico" -OutFile $IcoTarget -UseBasicParsing
+    } catch {}
 }
 
 # Add to User PATH
@@ -84,27 +107,27 @@ $WshShell = New-Object -ComObject WScript.Shell
 $StartMenuDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
 $DesktopDir = [Environment]::GetFolderPath("Desktop")
 
-# 1. Main GUI Shortcut (Runs Quick Settings GUI and adds to System Tray)
+# 1. Main GUI Shortcut (Runs Quick Settings GUI silently with NO console window)
 $GuiShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center.lnk"))
-$GuiShortcut.TargetPath = $ExeTarget
-$GuiShortcut.Arguments = "gui"
+$GuiShortcut.TargetPath = $GuiExeTarget
+$GuiShortcut.Arguments = ""
 $GuiShortcut.WorkingDirectory = $InstallDir
 $GuiShortcut.Description = "Acer Display Center - Monitor Quick Settings & System Tray"
 if (Test-Path $IcoTarget) { $GuiShortcut.IconLocation = "$IcoTarget,0" }
 $GuiShortcut.Save()
 
 $GuiDesktopShortcut = $WshShell.CreateShortcut((Join-Path $DesktopDir "Acer Display Center.lnk"))
-$GuiDesktopShortcut.TargetPath = $ExeTarget
-$GuiDesktopShortcut.Arguments = "gui"
+$GuiDesktopShortcut.TargetPath = $GuiExeTarget
+$GuiDesktopShortcut.Arguments = ""
 $GuiDesktopShortcut.WorkingDirectory = $InstallDir
 $GuiDesktopShortcut.Description = "Acer Display Center - Monitor Quick Settings & System Tray"
 if (Test-Path $IcoTarget) { $GuiDesktopShortcut.IconLocation = "$IcoTarget,0" }
 $GuiDesktopShortcut.Save()
-Write-Host "[+] Created GUI Shortcut: Acer Display Center (Start Menu & Desktop)" -ForegroundColor Green
+Write-Host "[+] Created 100% Silent GUI Shortcut: Acer Display Center (Start Menu & Desktop)" -ForegroundColor Green
 
-# 2. Tray Daemon Shortcut (Background System Tray Daemon)
+# 2. Tray Daemon Shortcut (Background System Tray Daemon silently with NO console window)
 $TrayShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center (Tray Only).lnk"))
-$TrayShortcut.TargetPath = $ExeTarget
+$TrayShortcut.TargetPath = $GuiExeTarget
 $TrayShortcut.Arguments = "tray"
 $TrayShortcut.WorkingDirectory = $InstallDir
 $TrayShortcut.Description = "Acer Display Center - System Tray Daemon"
@@ -112,24 +135,24 @@ if (Test-Path $IcoTarget) { $TrayShortcut.IconLocation = "$IcoTarget,0" }
 $TrayShortcut.Save()
 
 $TrayDesktopShortcut = $WshShell.CreateShortcut((Join-Path $DesktopDir "Acer Display Center (Tray Only).lnk"))
-$TrayDesktopShortcut.TargetPath = $ExeTarget
+$TrayDesktopShortcut.TargetPath = $GuiExeTarget
 $TrayDesktopShortcut.Arguments = "tray"
 $TrayDesktopShortcut.WorkingDirectory = $InstallDir
 $TrayDesktopShortcut.Description = "Acer Display Center - System Tray Daemon"
 if (Test-Path $IcoTarget) { $TrayDesktopShortcut.IconLocation = "$IcoTarget,0" }
 $TrayDesktopShortcut.Save()
-Write-Host "[+] Created Tray Shortcut: Acer Display Center (Tray Only) (Start Menu & Desktop)" -ForegroundColor Green
+Write-Host "[+] Created 100% Silent Tray Shortcut: Acer Display Center (Tray Only) (Start Menu & Desktop)" -ForegroundColor Green
 
 # Clean up any legacy Startup folder shortcuts to ensure ONLY the tray runs on boot
 $StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
 Remove-Item -Path (Join-Path $StartupDir "Acer*.lnk"), (Join-Path $StartupDir "Acer*.bat") -Force -ErrorAction SilentlyContinue
 
-# Configure Windows Run Registry Key: ONLY the background tray runs on boot / startup
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -Value "`"$ExeTarget`" tray" -Force
+# Configure Windows Run Registry Key: ONLY the background tray runs on boot / startup (Zero console)
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -Value "`"$GuiExeTarget`" tray" -Force
 Write-Host "[+] Configured ONLY the System Tray daemon to run on boot / startup (HKCU Run)." -ForegroundColor Green
 
 # Launch Tray Daemon Now (Detached background process)
-Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList "$ExeTarget tray" | Out-Null
+Start-Process -FilePath $GuiExeTarget -ArgumentList "tray" -WindowStyle Hidden
 Write-Host "[+] Started Acer Display Center System Tray Daemon!" -ForegroundColor Green
 
 Write-Host ""

@@ -3,7 +3,13 @@
 
 #[cfg(windows)]
 pub fn set_os_hdr(enable: bool) {
+    // Avoid redundant OS display pipeline tear-down & black screening if already in desired state
+    if get_os_hdr() == enable {
+        return;
+    }
+
     use windows::Win32::Devices::Display::{
+        DisplayConfigGetDeviceInfo,
         DisplayConfigSetDeviceInfo,
         GetDisplayConfigBufferSizes,
         DISPLAYCONFIG_DEVICE_INFO_HEADER,
@@ -14,12 +20,20 @@ pub fn set_os_hdr(enable: bool) {
     };
 
     const DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE: i32 = 16;
-    const DISPLAYCONFIG_MODE_INFO_TYPE_TARGET: i32 = 2;
+    const DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO: i32 = 9;
 
     #[repr(C)]
     struct DisplayConfigSetHdrState {
         header: DISPLAYCONFIG_DEVICE_INFO_HEADER,
         value: u32,
+    }
+
+    #[repr(C)]
+    struct DisplayConfigGetAdvancedColorInfo {
+        header: DISPLAYCONFIG_DEVICE_INFO_HEADER,
+        value: u32,
+        color_encoding: u32,
+        bits_per_channel: u32,
     }
 
     unsafe {
@@ -52,18 +66,36 @@ pub fn set_os_hdr(enable: bool) {
             return;
         }
 
-        for target in modes.iter().filter(|m| m.infoType.0 == DISPLAYCONFIG_MODE_INFO_TYPE_TARGET) {
-            let mut hdr = DisplayConfigSetHdrState {
+        for path in &paths {
+            let mut info = DisplayConfigGetAdvancedColorInfo {
                 header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
-                    r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE),
-                    size: std::mem::size_of::<DisplayConfigSetHdrState>() as u32,
-                    adapterId: target.adapterId,
-                    id: target.id,
+                    r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO),
+                    size: std::mem::size_of::<DisplayConfigGetAdvancedColorInfo>() as u32,
+                    adapterId: path.targetInfo.adapterId,
+                    id: path.targetInfo.id,
                 },
-                value: if enable { 1 } else { 0 },
+                value: 0,
+                color_encoding: 0,
+                bits_per_channel: 0,
             };
 
-            let _ = DisplayConfigSetDeviceInfo(&mut hdr.header);
+            // Only attempt to set HDR on displays that support advanced color (info.value & 0x1)
+            if DisplayConfigGetDeviceInfo(&mut info.header) == 0 {
+                let advanced_color_supported = (info.value & 0x1) != 0;
+                if advanced_color_supported {
+                    let mut hdr = DisplayConfigSetHdrState {
+                        header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
+                            r#type: windows::Win32::Devices::Display::DISPLAYCONFIG_DEVICE_INFO_TYPE(DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE),
+                            size: std::mem::size_of::<DisplayConfigSetHdrState>() as u32,
+                            adapterId: path.targetInfo.adapterId,
+                            id: path.targetInfo.id,
+                        },
+                        value: if enable { 1 } else { 0 },
+                    };
+
+                    let _ = DisplayConfigSetDeviceInfo(&mut hdr.header);
+                }
+            }
         }
     }
 }

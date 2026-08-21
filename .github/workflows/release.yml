@@ -38,6 +38,13 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist-artifacts/acer_monitor_cli-${{ matrix.target }}.exe" -Force
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist-artifacts/amctl.exe" -Force
           Copy-Item "target/${{ matrix.target }}/release/acer_monitor_cli.exe" "dist-artifacts/acer_monitor_cli.exe" -Force
+          if (Test-Path "target/${{ matrix.target }}/release/acer_display_center.exe") {
+            Copy-Item "target/${{ matrix.target }}/release/acer_display_center.exe" "dist-artifacts/acer_display_center-${{ matrix.target }}.exe" -Force
+            Copy-Item "target/${{ matrix.target }}/release/acer_display_center.exe" "dist-artifacts/acer_display_center.exe" -Force
+          }
+          if (Test-Path "install.ps1") { Copy-Item "install.ps1" "dist-artifacts/install.ps1" -Force }
+          if (Test-Path "uninstall.ps1") { Copy-Item "uninstall.ps1" "dist-artifacts/uninstall.ps1" -Force }
+          if (Test-Path "app.ico") { Copy-Item "app.ico" "dist-artifacts/app.ico" -Force }
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

@@ -101,53 +101,6 @@ mod win32_tray {
         }
     }
 
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct KBDLLHOOKSTRUCT {
-        vk_code: u32,
-        scan_code: u32,
-        flags: u32,
-        time: u32,
-        dw_extra_info: usize,
-    }
-
-    static mut HOOK_HANDLE: windows_sys::Win32::UI::WindowsAndMessaging::HHOOK = 0 as _;
-
-    unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        if code >= 0 && (wparam as u32 == 0x0100 /* WM_KEYDOWN */ || wparam as u32 == 0x0104 /* WM_SYSKEYDOWN */) {
-            if HOTKEYS_ENABLED.load(Ordering::SeqCst) {
-                let kbd = *(lparam as *const KBDLLHOOKSTRUCT);
-
-                let ctrl = (windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(0x11 /* VK_CONTROL */) as u16 & 0x8000) != 0;
-                let alt = (windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(0x12 /* VK_MENU */) as u16 & 0x8000) != 0;
-                let shift = (windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(0x10 /* VK_SHIFT */) as u16 & 0x8000) != 0;
-                let win = ((windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(0x5B /* VK_LWIN */) as u16 & 0x8000) != 0)
-                    || ((windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(0x5C /* VK_RWIN */) as u16 & 0x8000) != 0);
-
-                let config = crate::hotkeys::HotkeyConfig::load();
-                for binding in &config.bindings {
-                    if binding.mod_ctrl == ctrl
-                        && binding.mod_alt == alt
-                        && binding.mod_shift == shift
-                        && binding.mod_win == win
-                        && binding.win32_vk() == kbd.vk_code
-                    {
-                        let cmd = binding.command.clone();
-                        std::thread::spawn(move || {
-                            if cmd.first().map(|s| s.as_str()) == Some("gui") {
-                                spawn_gui();
-                            } else {
-                                let _ = crate::cli::dispatch_command(cmd);
-                            }
-                        });
-                        return 1; // Handled
-                    }
-                }
-            }
-        }
-        windows_sys::Win32::UI::WindowsAndMessaging::CallNextHookEx(HOOK_HANDLE, code, wparam, lparam)
-    }
-
     pub fn spawn_gui() {
         std::thread::spawn(|| {
             unsafe {
@@ -160,12 +113,39 @@ mod win32_tray {
                 }
             }
 
-            let exe = std::env::current_exe().unwrap_or_else(|_| {
-                std::path::PathBuf::from(r"C:\Users\Admin\AppData\Local\Programs\acer_monitor_cli\amctl.exe")
+            let current = std::env::current_exe().unwrap_or_else(|_| {
+                if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                    std::path::PathBuf::from(local).join("Programs").join("acer_monitor_cli").join("acer_display_center.exe")
+                } else {
+                    std::path::PathBuf::from("acer_display_center.exe")
+                }
             });
-            let _ = std::process::Command::new(&exe)
-                .arg("gui")
-                .spawn();
+
+            let exe = if let Some(parent) = current.parent() {
+                let sibling_gui = parent.join("acer_display_center.exe");
+                if sibling_gui.exists() {
+                    sibling_gui
+                } else {
+                    current
+                }
+            } else {
+                current
+            };
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new(&exe)
+                    .arg("gui")
+                    .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
+                    .spawn();
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = std::process::Command::new(&exe)
+                    .arg("gui")
+                    .spawn();
+            }
         });
     }
 
@@ -400,6 +380,34 @@ mod win32_tray {
 
         // 6. Color & Eye Shield Submenu
         let m_color = CreatePopupMenu();
+
+        // Hardware RGB Gain Submenu
+        let m_rgb = CreatePopupMenu();
+        AppendMenuW(m_rgb, MF_STRING, 630, to_wide("🔴 Red Gain: 100%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 631, to_wide("🔴 Red Gain: 75%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 632, to_wide("🔴 Red Gain: 50% (Default)").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 633, to_wide("🔴 Red Gain: 25%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 634, to_wide("🔴 Red Gain +5%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 635, to_wide("🔴 Red Gain -5%").as_ptr());
+        AppendMenuW(m_rgb, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(m_rgb, MF_STRING, 640, to_wide("🟢 Green Gain: 100%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 641, to_wide("🟢 Green Gain: 75%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 642, to_wide("🟢 Green Gain: 50% (Default)").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 643, to_wide("🟢 Green Gain: 25%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 644, to_wide("🟢 Green Gain +5%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 645, to_wide("🟢 Green Gain -5%").as_ptr());
+        AppendMenuW(m_rgb, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(m_rgb, MF_STRING, 650, to_wide("🔵 Blue Gain: 100%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 651, to_wide("🔵 Blue Gain: 75%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 652, to_wide("🔵 Blue Gain: 50% (Default)").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 653, to_wide("🔵 Blue Gain: 25%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 654, to_wide("🔵 Blue Gain +5%").as_ptr());
+        AppendMenuW(m_rgb, MF_STRING, 655, to_wide("🔵 Blue Gain -5%").as_ptr());
+        AppendMenuW(m_rgb, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(m_rgb, MF_STRING, 659, to_wide("↺ Reset RGB Gain (50 / 50 / 50)").as_ptr());
+        AppendMenuW(m_color, MF_POPUP, m_rgb as usize, to_wide("🎨 Hardware RGB Gain").as_ptr());
+        AppendMenuW(m_color, MF_SEPARATOR, 0, std::ptr::null());
+
         AppendMenuW(m_color, MF_STRING, 601, to_wide("🛡️ Blue Light: Off").as_ptr());
         AppendMenuW(m_color, MF_STRING, 602, to_wide("🛡️ Blue Light: 50% Level 1").as_ptr());
         AppendMenuW(m_color, MF_STRING, 603, to_wide("🛡️ Blue Light: 60% Level 2").as_ptr());
@@ -504,9 +512,20 @@ mod win32_tray {
             let msg = msg.to_string();
             std::thread::spawn(move || {
                 if let Ok(exe) = std::env::current_exe() {
-                    let _ = std::process::Command::new(exe)
-                        .args(["report", &title, &msg])
-                        .spawn();
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        let _ = std::process::Command::new(exe)
+                            .args(["report", &title, &msg])
+                            .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
+                            .spawn();
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        let _ = std::process::Command::new(exe)
+                            .args(["report", &title, &msg])
+                            .spawn();
+                    }
                 }
             });
         }
@@ -627,6 +646,29 @@ mod win32_tray {
             619 => run_cli(&["colorspace", "ebu"]),
             620 => run_cli(&["colorspace", "smpte-c"]),
 
+            // RGB Gain
+            630 => run_cli(&["gain", "red", "100"]),
+            631 => run_cli(&["gain", "red", "75"]),
+            632 => run_cli(&["gain", "red", "50"]),
+            633 => run_cli(&["gain", "red", "25"]),
+            634 => run_cli(&["gain", "red", "+5"]),
+            635 => run_cli(&["gain", "red", "-5"]),
+
+            640 => run_cli(&["gain", "green", "100"]),
+            641 => run_cli(&["gain", "green", "75"]),
+            642 => run_cli(&["gain", "green", "50"]),
+            643 => run_cli(&["gain", "green", "25"]),
+            644 => run_cli(&["gain", "green", "+5"]),
+            645 => run_cli(&["gain", "green", "-5"]),
+
+            650 => run_cli(&["gain", "blue", "100"]),
+            651 => run_cli(&["gain", "blue", "75"]),
+            652 => run_cli(&["gain", "blue", "50"]),
+            653 => run_cli(&["gain", "blue", "25"]),
+            654 => run_cli(&["gain", "blue", "+5"]),
+            655 => run_cli(&["gain", "blue", "-5"]),
+            659 => run_cli(&["gain", "reset"]),
+
             // Input
             701 => run_cli(&["input", "dp"]),
             702 => run_cli(&["input", "hdmi1"]),
@@ -734,9 +776,10 @@ mod win32_tray {
 
     pub fn run_tray() -> Result<(), String> {
         unsafe {
+            windows_sys::Win32::System::Console::FreeConsole();
             windows_sys::Win32::Foundation::SetLastError(0);
             let mutex_name = to_wide("Local\\AcerDisplayCenterTrayMutex");
-            let mutex_res = windows::Win32::System::Threading::CreateMutexW(
+            let _mutex_res = windows::Win32::System::Threading::CreateMutexW(
                 None,
                 true,
                 windows::core::PCWSTR(mutex_name.as_ptr()),
@@ -833,13 +876,6 @@ mod win32_tray {
                 }
             });
 
-            HOOK_HANDLE = windows_sys::Win32::UI::WindowsAndMessaging::SetWindowsHookExW(
-                13, // WH_KEYBOARD_LL
-                Some(low_level_keyboard_proc),
-                hinstance,
-                0,
-            );
-
             let mut msg: MSG = std::mem::zeroed();
             while !EXIT_REQUESTED.load(Ordering::SeqCst) {
                 let ret = GetMessageW(&mut msg, 0 as _, 0, 0);
@@ -852,11 +888,6 @@ mod win32_tray {
                 }
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
-            }
-
-            if HOOK_HANDLE != 0 as _ {
-                windows_sys::Win32::UI::WindowsAndMessaging::UnhookWindowsHookEx(HOOK_HANDLE);
-                HOOK_HANDLE = 0 as _;
             }
 
             for i in 1..=32 {

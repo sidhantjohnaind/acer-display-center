@@ -5,6 +5,7 @@ Write-Host "=== Acer Monitor CLI Suite Uninstaller (Windows) ===" -ForegroundCol
 Write-Host "[*] Stopping running processes and background widgets..." -ForegroundColor Yellow
 Stop-Process -Name "acer_monitor_cli" -Force -ErrorAction SilentlyContinue
 Stop-Process -Name "amctl" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "acer_display_center" -Force -ErrorAction SilentlyContinue
 
 # Stop background PowerShell tray scripts if active
 Get-Process powershell -ErrorAction SilentlyContinue | Where-Object {

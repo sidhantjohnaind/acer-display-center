@@ -24,7 +24,7 @@ impl eframe::App for CalibrationPatternApp {
                         while x <= rect.right() {
                             painter.line_segment(
                                 [Pos2::new(x, rect.top()), Pos2::new(x, rect.bottom())],
-                                Stroke::new(1.0, Color32::from_rgb(55, 65, 80)),
+                                Stroke::new(1.0_f32, Color32::from_rgb(55, 65, 80)),
                             );
                             x += step;
                         }
@@ -32,21 +32,21 @@ impl eframe::App for CalibrationPatternApp {
                         while y <= rect.bottom() {
                             painter.line_segment(
                                 [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-                                Stroke::new(1.0, Color32::from_rgb(55, 65, 80)),
+                                Stroke::new(1.0_f32, Color32::from_rgb(55, 65, 80)),
                             );
                             y += step;
                         }
                         // Center crosshair and alignment circle
                         let center = rect.center();
-                        painter.circle_stroke(center, 120.0, Stroke::new(2.0, Color32::WHITE));
-                        painter.circle_stroke(center, 240.0, Stroke::new(1.5, Color32::from_rgb(100, 180, 255)));
+                        painter.circle_stroke(center, 120.0, Stroke::new(2.0_f32, Color32::WHITE));
+                        painter.circle_stroke(center, 240.0, Stroke::new(1.5_f32, Color32::from_rgb(100, 180, 255)));
                         painter.line_segment(
                             [Pos2::new(center.x, rect.top()), Pos2::new(center.x, rect.bottom())],
-                            Stroke::new(2.0, Color32::from_rgb(239, 68, 68)),
+                            Stroke::new(2.0_f32, Color32::from_rgb(239, 68, 68)),
                         );
                         painter.line_segment(
                             [Pos2::new(rect.left(), center.y), Pos2::new(rect.right(), center.y)],
-                            Stroke::new(2.0, Color32::from_rgb(239, 68, 68)),
+                            Stroke::new(2.0_f32, Color32::from_rgb(239, 68, 68)),
                         );
                     }
                     "rgb" => {

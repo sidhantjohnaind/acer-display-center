@@ -25,6 +25,8 @@ pub enum AccentTheme {
     MonochromeIce,  // #E2E8F0
 }
 
+fn default_gain() -> u32 { 50 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedMonitorState {
     pub brightness: u32,
@@ -42,6 +44,12 @@ pub struct CachedMonitorState {
     pub color_space: String,
     pub selected_input: String,
     pub monitor_name: String,
+    #[serde(default = "default_gain")]
+    pub red_gain: u32,
+    #[serde(default = "default_gain")]
+    pub green_gain: u32,
+    #[serde(default = "default_gain")]
+    pub blue_gain: u32,
 }
 
 impl Default for CachedMonitorState {
@@ -62,6 +70,9 @@ impl Default for CachedMonitorState {
             color_space: "sRGB".into(),
             selected_input: "DP".into(),
             monitor_name: "Acer Nitro VG271U".into(),
+            red_gain: 50,
+            green_gain: 50,
+            blue_gain: 50,
         }
     }
 }
@@ -208,6 +219,9 @@ pub struct MonitorStateUpdate {
     pub color_space: Option<String>,
     pub input: Option<String>,
     pub monitor_name: Option<String>,
+    pub red_gain: Option<u32>,
+    pub green_gain: Option<u32>,
+    pub blue_gain: Option<u32>,
     pub status: Option<String>,
 }
 
@@ -314,6 +328,15 @@ fn probe_hardware_state() -> MonitorStateUpdate {
             if let Ok((inp, _)) = mon.get_vcp(0x60) {
                 update.input = Some(map_input(inp).to_string());
             }
+            if let Ok((r, _)) = mon.get_vcp(0x16) {
+                update.red_gain = Some(r);
+            }
+            if let Ok((g, _)) = mon.get_vcp(0x18) {
+                update.green_gain = Some(g);
+            }
+            if let Ok((b, _)) = mon.get_vcp(0x1A) {
+                update.blue_gain = Some(b);
+            }
             update.status = Some(format!("Synced with {}", mon.description));
         }
     }
@@ -344,6 +367,9 @@ pub struct AcerQuickSettingsApp {
     pub color_space: String,
     pub selected_input: String,
     pub monitor_name: String,
+    pub red_gain: u32,
+    pub green_gain: u32,
+    pub blue_gain: u32,
     pub status_text: String,
 
     // Async worker channels
@@ -356,6 +382,9 @@ pub struct AcerQuickSettingsApp {
     last_c_change: Option<(Instant, u32)>,
     last_v_change: Option<(Instant, u32)>,
     last_bb_change: Option<(Instant, u32)>,
+    last_rg_change: Option<(Instant, u32)>,
+    last_gg_change: Option<(Instant, u32)>,
+    last_bg_change: Option<(Instant, u32)>,
     pub is_syncing: bool,
     sync_started_at: Option<Instant>,
     sync_counter: u64,
@@ -368,6 +397,9 @@ pub struct AcerQuickSettingsApp {
     last_user_v_edit: Instant,
     last_user_bb_edit: Instant,
     last_user_preset_edit: Instant,
+    last_user_rg_edit: Instant,
+    last_user_gg_edit: Instant,
+    last_user_bg_edit: Instant,
     created_at: Instant,
     has_been_focused: bool,
     pub is_pinned: bool,
@@ -384,7 +416,11 @@ impl AcerQuickSettingsApp {
         let mut fonts = egui::FontDefinitions::default();
         #[cfg(windows)]
         {
-            if let Ok(segui_bytes) = std::fs::read("C:\\Windows\\Fonts\\seguiemj.ttf") {
+            let win_dir = std::env::var("WINDIR")
+                .or_else(|_| std::env::var("SystemRoot"))
+                .unwrap_or_else(|_| "C:\\Windows".to_string());
+            let fonts_dir = std::path::Path::new(&win_dir).join("Fonts");
+            if let Ok(segui_bytes) = std::fs::read(fonts_dir.join("seguiemj.ttf")) {
                 fonts.font_data.insert(
                     "seguiemj".to_owned(),
                     egui::FontData::from_owned(segui_bytes),
@@ -393,7 +429,7 @@ impl AcerQuickSettingsApp {
                     vec.push("seguiemj".to_owned());
                 }
             }
-            if let Ok(sym_bytes) = std::fs::read("C:\\Windows\\Fonts\\seguisym.ttf") {
+            if let Ok(sym_bytes) = std::fs::read(fonts_dir.join("seguisym.ttf")) {
                 fonts.font_data.insert(
                     "seguisym".to_owned(),
                     egui::FontData::from_owned(sym_bytes),
@@ -427,7 +463,7 @@ impl AcerQuickSettingsApp {
 
                 let first_arg = args.first().cloned().unwrap_or_default();
                 let is_report_cmd = matches!(first_arg.as_str(), "diag" | "energy" | "edid" | "caps" | "info" | "scan");
-                let is_mode_change_cmd = matches!(first_arg.as_str(), "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sdr" | "brightness" | "contrast");
+                let is_mode_change_cmd = matches!(first_arg.as_str(), "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sdr" | "brightness" | "contrast" | "gain" | "rgb" | "red" | "green" | "blue");
 
                 match crate::cli::dispatch_command(args) {
                     Ok(output) => {
@@ -520,6 +556,9 @@ impl AcerQuickSettingsApp {
             color_space: settings.last_state.color_space,
             selected_input: settings.last_state.selected_input,
             monitor_name: settings.last_state.monitor_name,
+            red_gain: settings.last_state.red_gain,
+            green_gain: settings.last_state.green_gain,
+            blue_gain: settings.last_state.blue_gain,
             status_text: "Connected via DDC/CI".into(),
             tx_cmd,
             rx_status,
@@ -528,6 +567,9 @@ impl AcerQuickSettingsApp {
             last_c_change: None,
             last_v_change: None,
             last_bb_change: None,
+            last_rg_change: None,
+            last_gg_change: None,
+            last_bg_change: None,
             is_syncing: false,
             sync_started_at: None,
             sync_counter: 0,
@@ -538,6 +580,9 @@ impl AcerQuickSettingsApp {
             last_user_v_edit: past,
             last_user_bb_edit: past,
             last_user_preset_edit: past,
+            last_user_rg_edit: past,
+            last_user_gg_edit: past,
+            last_user_bg_edit: past,
             created_at: Instant::now(),
             has_been_focused: false,
             is_pinned: false,
@@ -566,6 +611,9 @@ impl AcerQuickSettingsApp {
                 color_space: self.color_space.clone(),
                 selected_input: self.selected_input.clone(),
                 monitor_name: self.monitor_name.clone(),
+                red_gain: self.red_gain,
+                green_gain: self.green_gain,
+                blue_gain: self.blue_gain,
             },
         };
         let _ = settings.save();
@@ -573,7 +621,7 @@ impl AcerQuickSettingsApp {
 
     fn send_cmd(&mut self, args: &[&str]) {
         let first_arg = args.first().copied().unwrap_or_default();
-        let is_sync_trigger = matches!(first_arg, "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sync" | "brightness" | "contrast" | "sdr");
+        let is_sync_trigger = matches!(first_arg, "preset" | "hdr" | "reset" | "od" | "bluelight" | "colortemp" | "gamma" | "colorspace" | "input" | "sync" | "brightness" | "contrast" | "sdr" | "gain" | "rgb" | "red" | "green" | "blue");
         let id = if is_sync_trigger {
             self.sync_counter += 1;
             let cur_id = self.sync_counter;
@@ -629,8 +677,9 @@ impl eframe::App for AcerQuickSettingsApp {
 
             #[cfg(windows)]
             {
+                use std::os::windows::ffi::OsStrExt;
                 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
-                use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetForegroundWindow, GetWindowRect};
+                use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowW, GetCursorPos, GetWindowRect};
                 use windows_sys::Win32::Foundation::{POINT, RECT};
 
                 let l_down = (unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } as u16 & 0x8000) != 0;
@@ -640,12 +689,16 @@ impl eframe::App for AcerQuickSettingsApp {
                     unsafe {
                         let mut pt: POINT = std::mem::zeroed();
                         GetCursorPos(&mut pt);
-                        let fg = GetForegroundWindow();
-                        if fg != 0 as _ {
+                        let title: Vec<u16> = std::ffi::OsStr::new("Acer Display Center")
+                            .encode_wide()
+                            .chain(Some(0))
+                            .collect();
+                        let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+                        if hwnd != 0 as _ {
                             let mut rect: RECT = std::mem::zeroed();
-                            GetWindowRect(fg, &mut rect);
-                            let inside_fg = pt.x >= rect.left && pt.x <= rect.right && pt.y >= rect.top && pt.y <= rect.bottom;
-                            if !inside_fg {
+                            GetWindowRect(hwnd, &mut rect);
+                            let inside_gui = pt.x >= rect.left && pt.x <= rect.right && pt.y >= rect.top && pt.y <= rect.bottom;
+                            if !inside_gui {
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                                 return;
                             }
@@ -715,6 +768,21 @@ impl eframe::App for AcerQuickSettingsApp {
             if let Some(cs) = st.color_space { self.color_space = cs; }
             if let Some(inp) = st.input { self.selected_input = inp; }
             if let Some(name) = st.monitor_name { self.monitor_name = name; }
+            if let Some(r) = st.red_gain {
+                if (is_sync_reply || now.duration_since(self.last_user_rg_edit) > Duration::from_millis(600)) && self.last_rg_change.is_none() {
+                    self.red_gain = r;
+                }
+            }
+            if let Some(g) = st.green_gain {
+                if (is_sync_reply || now.duration_since(self.last_user_gg_edit) > Duration::from_millis(600)) && self.last_gg_change.is_none() {
+                    self.green_gain = g;
+                }
+            }
+            if let Some(b) = st.blue_gain {
+                if (is_sync_reply || now.duration_since(self.last_user_bg_edit) > Duration::from_millis(600)) && self.last_bg_change.is_none() {
+                    self.blue_gain = b;
+                }
+            }
             if let Some(stat) = st.status { self.status_text = stat; }
 
             // Clear is_syncing only AFTER applying the state
@@ -753,6 +821,27 @@ impl eframe::App for AcerQuickSettingsApp {
             if now.duration_since(time) >= Duration::from_millis(80) {
                 self.send_cmd(&["volume", &val.to_string()]);
                 self.last_v_change = None;
+                self.save_settings();
+            }
+        }
+        if let Some((time, val)) = self.last_rg_change {
+            if now.duration_since(time) >= Duration::from_millis(80) {
+                self.send_cmd(&["gain", "red", &val.to_string()]);
+                self.last_rg_change = None;
+                self.save_settings();
+            }
+        }
+        if let Some((time, val)) = self.last_gg_change {
+            if now.duration_since(time) >= Duration::from_millis(80) {
+                self.send_cmd(&["gain", "green", &val.to_string()]);
+                self.last_gg_change = None;
+                self.save_settings();
+            }
+        }
+        if let Some((time, val)) = self.last_bg_change {
+            if now.duration_since(time) >= Duration::from_millis(80) {
+                self.send_cmd(&["gain", "blue", &val.to_string()]);
+                self.last_bg_change = None;
                 self.save_settings();
             }
         }
@@ -1764,98 +1853,166 @@ impl AcerQuickSettingsApp {
     }
 
     fn render_color_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
-        ui.label(egui::RichText::new("🌡  Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
-        ui.add_space(2.0);
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.label(egui::RichText::new("🌡  Color Temperature").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                ui.add_space(2.0);
 
-        let temps = [
-            ("Warm (4000K)", "warm"),
-            ("Normal (6500K)", "normal"),
-            ("Cool (9300K)", "cool"),
-            ("BlueLight", "bluelight"),
-            ("User", "user"),
-        ];
-        let ct_w = (ui.available_width() - 16.0) / 5.0;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for &(name, cmd) in &temps {
-                let is_sel = self.color_temp.eq_ignore_ascii_case(cmd);
-                let short_name = name.split(' ').next().unwrap_or(name);
-                let btn_id = egui::Id::new(format!("ct_btn_{cmd}"));
+                let temps = [
+                    ("Warm (4000K)", "warm"),
+                    ("Normal (6500K)", "normal"),
+                    ("Cool (9300K)", "cool"),
+                    ("BlueLight", "bluelight"),
+                    ("User", "user"),
+                ];
+                let ct_w = (ui.available_width() - 16.0) / 5.0;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for &(name, cmd) in &temps {
+                        let is_sel = self.color_temp.eq_ignore_ascii_case(cmd);
+                        let short_name = name.split(' ').next().unwrap_or(name);
+                        let btn_id = egui::Id::new(format!("ct_btn_{cmd}"));
 
-                if Self::render_card_button(ui, btn_id, short_name, is_sel, Vec2::new(ct_w, 24.0), accent).clicked() {
-                    self.color_temp = cmd.into();
-                    self.show_toast(format!("Color Temp set to {name}"));
-                    self.send_cmd(&["colortemp", cmd]);
+                        if Self::render_card_button(ui, btn_id, short_name, is_sel, Vec2::new(ct_w, 24.0), accent).clicked() {
+                            self.color_temp = cmd.into();
+                            self.show_toast(format!("Color Temp set to {name}"));
+                            self.send_cmd(&["colortemp", cmd]);
+                        }
+                    }
+                });
+
+                ui.add_space(5.0);
+                ui.label(egui::RichText::new("🛡  Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                ui.add_space(2.0);
+
+                let bls = [("Off", 0), ("50%", 1), ("60%", 2), ("70%", 3), ("80%", 4)];
+                let bl_w = (ui.available_width() - 16.0) / 5.0;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for &(name, val) in &bls {
+                        let is_sel = self.blue_light == val;
+                        let btn_id = egui::Id::new(format!("bl_btn_{val}"));
+
+                        if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(bl_w, 24.0), accent).clicked() {
+                            self.blue_light = val;
+                            self.show_toast(format!("Blue Light: {name}"));
+                            self.send_cmd(&["bluelight", &val.to_string()]);
+                        }
+                    }
+                });
+
+                ui.add_space(5.0);
+                ui.label(egui::RichText::new("📐  Gamma Curve").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                ui.add_space(2.0);
+
+                let gammas = [("1.8", "18"), ("2.0", "20"), ("2.2 (Std)", "22"), ("2.4", "24"), ("2.6", "26")];
+                let gm_w = (ui.available_width() - 16.0) / 5.0;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for &(name, cmd) in &gammas {
+                        let is_sel = self.gamma == cmd;
+                        let btn_id = egui::Id::new(format!("gm_btn_{cmd}"));
+
+                        if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(gm_w, 24.0), accent).clicked() {
+                            self.gamma = cmd.into();
+                            self.show_toast(format!("Gamma Curve set to {name}"));
+                            self.send_cmd(&["gamma", cmd]);
+                        }
+                    }
+                });
+
+                ui.add_space(5.0);
+                ui.label(egui::RichText::new("🎨  Color Space Profile").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                ui.add_space(2.0);
+
+                let spaces = [
+                    ("sRGB", "0", "0"),
+                    ("Rec.709", "0", "1"),
+                    ("HDR", "0", "2"),
+                    ("EBU", "0", "3"),
+                    ("DCI-P3", "0", "4"),
+                    ("General", "0", "6"),
+                ];
+                let sp_w = (ui.available_width() - 8.0) / 3.0;
+                egui::Grid::new("color_space_grid").num_columns(3).spacing([4.0, 4.0]).show(ui, |ui| {
+                    for (i, &(name, cal, sp)) in spaces.iter().enumerate() {
+                        let is_sel = self.color_space.eq_ignore_ascii_case(name);
+                        let btn_id = egui::Id::new(format!("cs_btn_{name}"));
+
+                        if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(sp_w, 25.0), accent).clicked() {
+                            self.color_space = name.into();
+                            self.show_toast(format!("Color Space: {name}"));
+                            self.send_cmd(&["colorspace", cal, sp]);
+                        }
+                        if (i + 1) % 3 == 0 { ui.end_row(); }
+                    }
+                });
+
+                ui.add_space(7.0);
+
+                // Hardware RGB Gain / Balance Header & Reset Button (Positioned at bottom)
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("🎨  Hardware RGB Gain / Balance").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let reset_btn = ui.add(
+                            egui::Button::new(egui::RichText::new("↺ Reset 50/50/50").size(9.5).color(Color32::WHITE))
+                                .fill(Color32::from_rgb(28, 34, 48))
+                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 56, 76)))
+                                .rounding(Rounding::same(3.0))
+                                .min_size(Vec2::new(75.0, 18.0)),
+                        );
+                        if reset_btn.clicked() {
+                            self.red_gain = 50;
+                            self.green_gain = 50;
+                            self.blue_gain = 50;
+                            self.last_rg_change = None;
+                            self.last_gg_change = None;
+                            self.last_bg_change = None;
+                            self.show_toast("Reset RGB Gain to 50 / 50 / 50");
+                            self.send_cmd(&["gain", "reset"]);
+                            self.save_settings();
+                        }
+                    });
+                });
+                ui.add_space(3.0);
+
+                // Red Gain Slider
+                let mut rg_val = self.red_gain;
+                let mut rg_change = self.last_rg_change;
+                let red_accent = Color32::from_rgb(239, 68, 68);
+                if self.render_slider_card(ui, "🔴 Red Gain (0x16)", &mut rg_val, 100, "%", &[25, 50, 75, 100], &mut rg_change, red_accent) {
+                    self.last_user_rg_edit = Instant::now();
                 }
-            }
-        });
+                self.red_gain = rg_val;
+                self.last_rg_change = rg_change;
 
-        ui.add_space(5.0);
-        ui.label(egui::RichText::new("🛡  Blue Light Eye Shield").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
-        ui.add_space(2.0);
+                ui.add_space(3.0);
 
-        let bls = [("Off", 0), ("50%", 1), ("60%", 2), ("70%", 3), ("80%", 4)];
-        let bl_w = (ui.available_width() - 16.0) / 5.0;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for &(name, val) in &bls {
-                let is_sel = self.blue_light == val;
-                let btn_id = egui::Id::new(format!("bl_btn_{val}"));
-
-                if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(bl_w, 24.0), accent).clicked() {
-                    self.blue_light = val;
-                    self.show_toast(format!("Blue Light: {name}"));
-                    self.send_cmd(&["bluelight", &val.to_string()]);
+                // Green Gain Slider
+                let mut gg_val = self.green_gain;
+                let mut gg_change = self.last_gg_change;
+                let green_accent = Color32::from_rgb(34, 197, 94);
+                if self.render_slider_card(ui, "🟢 Green Gain (0x18)", &mut gg_val, 100, "%", &[25, 50, 75, 100], &mut gg_change, green_accent) {
+                    self.last_user_gg_edit = Instant::now();
                 }
-            }
-        });
+                self.green_gain = gg_val;
+                self.last_gg_change = gg_change;
 
-        ui.add_space(5.0);
-        ui.label(egui::RichText::new("📐  Gamma Curve").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
-        ui.add_space(2.0);
+                ui.add_space(3.0);
 
-        let gammas = [("1.8", "18"), ("2.0", "20"), ("2.2 (Std)", "22"), ("2.4", "24"), ("2.6", "26")];
-        let gm_w = (ui.available_width() - 16.0) / 5.0;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for &(name, cmd) in &gammas {
-                let is_sel = self.gamma == cmd;
-                let btn_id = egui::Id::new(format!("gm_btn_{cmd}"));
-
-                if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(gm_w, 24.0), accent).clicked() {
-                    self.gamma = cmd.into();
-                    self.show_toast(format!("Gamma Curve set to {name}"));
-                    self.send_cmd(&["gamma", cmd]);
+                // Blue Gain Slider
+                let mut bg_val = self.blue_gain;
+                let mut bg_change = self.last_bg_change;
+                let blue_accent = Color32::from_rgb(59, 130, 246);
+                if self.render_slider_card(ui, "🔵 Blue Gain (0x1A)", &mut bg_val, 100, "%", &[25, 50, 75, 100], &mut bg_change, blue_accent) {
+                    self.last_user_bg_edit = Instant::now();
                 }
-            }
-        });
+                self.blue_gain = bg_val;
+                self.last_bg_change = bg_change;
 
-        ui.add_space(5.0);
-        ui.label(egui::RichText::new("🎨  Color Space Profile").strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
-        ui.add_space(2.0);
-
-        let spaces = [
-            ("sRGB", "0", "0"),
-            ("Rec.709", "0", "1"),
-            ("HDR", "0", "2"),
-            ("EBU", "0", "3"),
-            ("DCI-P3", "0", "4"),
-            ("General", "0", "6"),
-        ];
-        let sp_w = (ui.available_width() - 8.0) / 3.0;
-        egui::Grid::new("color_space_grid").num_columns(3).spacing([4.0, 4.0]).show(ui, |ui| {
-            for (i, &(name, cal, sp)) in spaces.iter().enumerate() {
-                let is_sel = self.color_space.eq_ignore_ascii_case(name);
-                let btn_id = egui::Id::new(format!("cs_btn_{name}"));
-
-                if Self::render_card_button(ui, btn_id, name, is_sel, Vec2::new(sp_w, 25.0), accent).clicked() {
-                    self.color_space = name.into();
-                    self.show_toast(format!("Color Space: {name}"));
-                    self.send_cmd(&["colorspace", cal, sp]);
-                }
-                if (i + 1) % 3 == 0 { ui.end_row(); }
-            }
-        });
+                ui.add_space(4.0);
+            });
     }
 
     fn render_tools_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
@@ -2081,7 +2238,7 @@ impl AcerQuickSettingsApp {
                 for (i, binding) in self.hotkey_config.bindings.iter_mut().enumerate() {
                     egui::Frame::none()
                         .fill(Color32::from_rgb(16, 19, 26))
-                        .stroke(Stroke::new(1.0, Color32::from_rgb(28, 34, 46)))
+                        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(28, 34, 46)))
                         .rounding(Rounding::same(6.0))
                         .inner_margin(Margin::symmetric(10.0, 7.0))
                         .show(ui, |ui| {
@@ -2113,7 +2270,7 @@ impl AcerQuickSettingsApp {
                                     let del_btn = ui.add(
                                         egui::Button::new(egui::RichText::new("🗑").size(10.0).color(Color32::from_rgb(239, 68, 68)))
                                             .fill(Color32::from_rgb(32, 20, 24))
-                                            .stroke(Stroke::new(1.0, Color32::from_rgb(70, 30, 36)))
+                                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(70, 30, 36)))
                                             .rounding(Rounding::same(3.0))
                                             .min_size(Vec2::new(20.0, 18.0)),
                                     );
@@ -2219,6 +2376,11 @@ fn get_tray_popup_pos(width: f32, height: f32) -> Option<Pos2> {
 }
 
 pub fn run_gui() -> Result<(), String> {
+    #[cfg(windows)]
+    unsafe {
+        windows_sys::Win32::System::Console::FreeConsole();
+    }
+
     let width = 420.0;
     let height = 690.0;
 
@@ -2285,7 +2447,7 @@ impl eframe::App for AcerReportApp {
             .frame(
                 egui::Frame::none()
                     .fill(Color32::from_rgb(11, 13, 18))
-                    .stroke(Stroke::new(1.0, Color32::from_rgb(32, 36, 48)))
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(32, 36, 48)))
                     .rounding(Rounding::same(8.0))
                     .inner_margin(Margin::symmetric(14.0, 12.0)),
             )
@@ -2308,7 +2470,7 @@ impl eframe::App for AcerReportApp {
                             .add(
                                 egui::Button::new(egui::RichText::new("✕ Close").size(10.5).color(Color32::WHITE))
                                     .fill(Color32::from_rgb(34, 40, 56))
-                                    .stroke(Stroke::new(1.0, Color32::from_rgb(48, 56, 76)))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 56, 76)))
                                     .rounding(Rounding::same(4.0))
                                     .min_size(Vec2::new(55.0, 24.0)),
                             )
@@ -2346,7 +2508,7 @@ impl eframe::App for AcerReportApp {
                 // Code / Content Scrollable Area
                 egui::Frame::none()
                     .fill(Color32::from_rgb(16, 19, 26))
-                    .stroke(Stroke::new(1.0, Color32::from_rgb(28, 34, 46)))
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(28, 34, 46)))
                     .rounding(Rounding::same(6.0))
                     .inner_margin(Margin::same(12.0))
                     .show(ui, |ui| {

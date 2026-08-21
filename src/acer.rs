@@ -179,6 +179,44 @@ pub fn get_color_space(mon: &mut Monitor) -> Result<(u32, u32), String> {
     get_raw_bank(mon, 0xE9, 0x00)
 }
 
+pub fn red_gain(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x16, value)
+}
+
+pub fn green_gain(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x18, value)
+}
+
+pub fn blue_gain(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x1A, value)
+}
+
+pub fn get_rgb_gain(mon: &mut Monitor) -> Result<(u32, u32, u32), String> {
+    let (r, _) = mon.get_vcp(0x16)?;
+    let (g, _) = mon.get_vcp(0x18)?;
+    let (b, _) = mon.get_vcp(0x1A)?;
+    Ok((r, g, b))
+}
+
+pub fn set_rgb_gain(mon: &mut Monitor, r: u32, g: u32, b: u32) -> Result<(), String> {
+    mon.set_vcp(0x16, r)?;
+    mon.set_vcp(0x18, g)?;
+    mon.set_vcp(0x1A, b)?;
+    Ok(())
+}
+
+pub fn red_bias(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x6C, value)
+}
+
+pub fn green_bias(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x6E, value)
+}
+
+pub fn blue_bias(mon: &mut Monitor, value: u32) -> Result<(), String> {
+    mon.set_vcp(0x70, value)
+}
+
 pub fn fade_vcp(mon: &mut Monitor, code: u8, start_val: u32, end_val: u32, duration_ms: u64) -> Result<(), String> {
     let steps = 20u64.min(duration_ms.max(1));
     let step_delay = std::time::Duration::from_millis(duration_ms / steps);

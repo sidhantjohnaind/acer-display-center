@@ -17,17 +17,27 @@ pub fn run() -> Result<(), String> {
 }
 
 fn launch_gui_with_tray() -> Result<(), String> {
-    std::thread::spawn(|| {
-        let _ = crate::tray::run_tray();
-    });
-    std::thread::sleep(std::time::Duration::from_millis(80));
-    let res = crate::gui::run_gui();
-    if let Err(e) = res {
-        eprintln!("GUI Error: {e}");
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        use std::os::windows::process::CommandExt;
+        let exe = std::env::current_exe().unwrap_or_else(|_| {
+            std::path::PathBuf::from("amctl.exe")
+        });
+        // Ensure tray daemon is running in background if not already active
+        let _ = Command::new(&exe)
+            .arg("tray")
+            .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
+            .spawn();
     }
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+    #[cfg(not(windows))]
+    {
+        std::thread::spawn(|| {
+            let _ = crate::tray::run_tray();
+        });
     }
+
+    crate::gui::run_gui()
 }
 
 pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
@@ -63,11 +73,8 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             };
 
             with_monitor(spec, |mon| {
-                // 1. Direct hardware Display Mode register (Acer 0xE2)
+                // Direct hardware Display Mode register (Acer 0xE2)
                 mon.set_vcp(0xE2, val)?;
-                // 2. Also send VESA MCCS 0x14 (Color Preset) & 0xDC (Display Application)
-                let _ = mon.set_vcp(0x14, val.min(5));
-                let _ = mon.set_vcp(0xDC, val);
                 Ok(())
             })?;
 
@@ -196,6 +203,8 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
         }
 
         "watch-vcp" | "watch" => run_watch_vcp(args),
+
+        "record" | "record-vcp" | "diff" | "diff-vcp" | "learn" => run_record_vcp(args),
 
         "watch-monitors" => {
             println!("Hotplug Monitor Watcher running... Press Ctrl+C to stop.");
@@ -747,6 +756,202 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             let spec = parse_optional_specifier(&args[spec_start..]);
             with_monitor(spec, |mon| acer::color_space(mon, calib, space))?;
             Ok("OK".to_string())
+        }
+
+        "gain" | "rgb" => {
+            if args.is_empty() {
+                let spec = parse_optional_specifier(&args);
+                let (r, g, b) = with_monitor(spec, |mon| acer::get_rgb_gain(mon))?;
+                return Ok(format!("Hardware RGB Gain: Red={r}%, Green={g}%, Blue={b}%"));
+            }
+
+            let sub = args[0].to_ascii_lowercase();
+            match sub.as_str() {
+                "reset" => {
+                    let spec = parse_optional_specifier(&args[1..]);
+                    with_monitor(spec, |mon| {
+                        acer::set_rgb_gain(mon, 50, 50, 50)
+                    })?;
+                    Ok("Hardware RGB Gain reset to default (50 / 50 / 50).".to_string())
+                }
+                "red" | "r" => {
+                    if args.len() < 2 {
+                        let spec = parse_optional_specifier(&args[1..]);
+                        let (r, _) = with_monitor(spec, |mon| mon.get_vcp(0x16))?;
+                        return Ok(format!("Red Gain: {r}%"));
+                    }
+                    let val_str = &args[1];
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| {
+                        let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                            let (cur, max) = mon.get_vcp(0x16).unwrap_or((50, 100));
+                            parse_relative_or_abs(val_str, cur, max)?
+                        } else {
+                            parse_u32(val_str)?
+                        };
+                        acer::red_gain(mon, val.clamp(0, 100))
+                    })?;
+                    Ok("OK".to_string())
+                }
+                "green" | "g" => {
+                    if args.len() < 2 {
+                        let spec = parse_optional_specifier(&args[1..]);
+                        let (g, _) = with_monitor(spec, |mon| mon.get_vcp(0x18))?;
+                        return Ok(format!("Green Gain: {g}%"));
+                    }
+                    let val_str = &args[1];
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| {
+                        let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                            let (cur, max) = mon.get_vcp(0x18).unwrap_or((50, 100));
+                            parse_relative_or_abs(val_str, cur, max)?
+                        } else {
+                            parse_u32(val_str)?
+                        };
+                        acer::green_gain(mon, val.clamp(0, 100))
+                    })?;
+                    Ok("OK".to_string())
+                }
+                "blue" | "b" => {
+                    if args.len() < 2 {
+                        let spec = parse_optional_specifier(&args[1..]);
+                        let (b, _) = with_monitor(spec, |mon| mon.get_vcp(0x1A))?;
+                        return Ok(format!("Blue Gain: {b}%"));
+                    }
+                    let val_str = &args[1];
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| {
+                        let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                            let (cur, max) = mon.get_vcp(0x1A).unwrap_or((50, 100));
+                            parse_relative_or_abs(val_str, cur, max)?
+                        } else {
+                            parse_u32(val_str)?
+                        };
+                        acer::blue_gain(mon, val.clamp(0, 100))
+                    })?;
+                    Ok("OK".to_string())
+                }
+                _ => {
+                    if args.len() >= 3 {
+                        let r = parse_u32(&args[0])?.clamp(0, 100);
+                        let g = parse_u32(&args[1])?.clamp(0, 100);
+                        let b = parse_u32(&args[2])?.clamp(0, 100);
+                        let spec = parse_optional_specifier(&args[3..]);
+                        with_monitor(spec, |mon| acer::set_rgb_gain(mon, r, g, b))?;
+                        Ok(format!("Hardware RGB Gain set to Red={r}%, Green={g}%, Blue={b}%."))
+                    } else {
+                        Err("Usage: amctl gain <red|green|blue|reset> <value> OR amctl gain <r> <g> <b>".to_string())
+                    }
+                }
+            }
+        }
+
+        "red" => {
+            if args.is_empty() {
+                let spec = parse_optional_specifier(&args);
+                let (r, _) = with_monitor(spec, |mon| mon.get_vcp(0x16))?;
+                return Ok(format!("Red Gain: {r}%"));
+            }
+            let val_str = &args[0];
+            let spec = parse_optional_specifier(&args[1..]);
+            with_monitor(spec, |mon| {
+                let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                    let (cur, max) = mon.get_vcp(0x16).unwrap_or((50, 100));
+                    parse_relative_or_abs(val_str, cur, max)?
+                } else {
+                    parse_u32(val_str)?
+                };
+                acer::red_gain(mon, val.clamp(0, 100))
+            })?;
+            Ok("OK".to_string())
+        }
+
+        "green" => {
+            if args.is_empty() {
+                let spec = parse_optional_specifier(&args);
+                let (g, _) = with_monitor(spec, |mon| mon.get_vcp(0x18))?;
+                return Ok(format!("Green Gain: {g}%"));
+            }
+            let val_str = &args[0];
+            let spec = parse_optional_specifier(&args[1..]);
+            with_monitor(spec, |mon| {
+                let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                    let (cur, max) = mon.get_vcp(0x18).unwrap_or((50, 100));
+                    parse_relative_or_abs(val_str, cur, max)?
+                } else {
+                    parse_u32(val_str)?
+                };
+                acer::green_gain(mon, val.clamp(0, 100))
+            })?;
+            Ok("OK".to_string())
+        }
+
+        "blue" => {
+            if args.is_empty() {
+                let spec = parse_optional_specifier(&args);
+                let (b, _) = with_monitor(spec, |mon| mon.get_vcp(0x1A))?;
+                return Ok(format!("Blue Gain: {b}%"));
+            }
+            let val_str = &args[0];
+            let spec = parse_optional_specifier(&args[1..]);
+            with_monitor(spec, |mon| {
+                let val = if val_str.starts_with('+') || val_str.starts_with('-') {
+                    let (cur, max) = mon.get_vcp(0x1A).unwrap_or((50, 100));
+                    parse_relative_or_abs(val_str, cur, max)?
+                } else {
+                    parse_u32(val_str)?
+                };
+                acer::blue_gain(mon, val.clamp(0, 100))
+            })?;
+            Ok("OK".to_string())
+        }
+
+        "bias" => {
+            if args.is_empty() {
+                let spec = parse_optional_specifier(&args);
+                let (r, _) = with_monitor(spec, |mon| mon.get_vcp(0x6C))?;
+                let (g, _) = with_monitor(spec, |mon| mon.get_vcp(0x6E))?;
+                let (b, _) = with_monitor(spec, |mon| mon.get_vcp(0x70))?;
+                return Ok(format!("Hardware RGB Bias: Red={r}%, Green={g}%, Blue={b}%"));
+            }
+            let sub = args[0].to_ascii_lowercase();
+            match sub.as_str() {
+                "red" | "r" => {
+                    let val = parse_u32(&args[1])?.clamp(0, 100);
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| acer::red_bias(mon, val))?;
+                    Ok("OK".to_string())
+                }
+                "green" | "g" => {
+                    let val = parse_u32(&args[1])?.clamp(0, 100);
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| acer::green_bias(mon, val))?;
+                    Ok("OK".to_string())
+                }
+                "blue" | "b" => {
+                    let val = parse_u32(&args[1])?.clamp(0, 100);
+                    let spec = parse_optional_specifier(&args[2..]);
+                    with_monitor(spec, |mon| acer::blue_bias(mon, val))?;
+                    Ok("OK".to_string())
+                }
+                _ => {
+                    if args.len() >= 3 {
+                        let r = parse_u32(&args[0])?.clamp(0, 100);
+                        let g = parse_u32(&args[1])?.clamp(0, 100);
+                        let b = parse_u32(&args[2])?.clamp(0, 100);
+                        let spec = parse_optional_specifier(&args[3..]);
+                        with_monitor(spec, |mon| {
+                            acer::red_bias(mon, r)?;
+                            acer::green_bias(mon, g)?;
+                            acer::blue_bias(mon, b)?;
+                            Ok(())
+                        })?;
+                        Ok(format!("Hardware RGB Bias set to Red={r}%, Green={g}%, Blue={b}%."))
+                    } else {
+                        Err("Usage: amctl bias <red|green|blue> <value> OR amctl bias <r> <g> <b>".to_string())
+                    }
+                }
+            }
         }
 
         "blackboost" | "black-boost" | "bb" => {
@@ -1742,6 +1947,90 @@ fn run_watch_vcp(args: Vec<String>) -> Result<String, String> {
             }
         }
     }
+}
+
+fn run_record_vcp(args: Vec<String>) -> Result<String, String> {
+    use std::io::{self, BufRead, Write};
+    let spec = parse_optional_specifier(&args);
+    let mut set = MonitorSet::enumerate()?;
+    let mon = set.pick_mut_by_specifier(spec)?;
+
+    println!("========================================================================");
+    println!("[amctl] Hardware VCP Register Change Recorder");
+    println!("Target Monitor: '{}'", mon.description);
+    println!("========================================================================");
+
+    let mut baseline: std::collections::BTreeMap<u8, (u32, u32)> = std::collections::BTreeMap::new();
+    println!("[1/2] Scanning all readable VCP codes (0x00 - 0xFF) for baseline snapshot...");
+    for code in 0x00u8..=0xFFu8 {
+        if let Ok((cur, max)) = mon.get_vcp(code) {
+            baseline.insert(code, (cur, max));
+        }
+    }
+    println!("[+] Recorded baseline snapshot with {} active VCP registers.", baseline.len());
+
+    loop {
+        println!("------------------------------------------------------------------------");
+        println!(">>> STEP 1: Change the target setting on your monitor OSD now");
+        println!("           (e.g., adjust Red/Green/Blue Gain, Color Temp, or Preset).");
+        println!(">>> STEP 2: Press [ENTER] in this terminal to detect what changed.");
+        print!("\nPress [ENTER] to compare (or type 'q' and Enter to exit): ");
+        let _ = io::stdout().flush();
+
+        let mut input = String::new();
+        let stdin = io::stdin();
+        let _ = stdin.lock().read_line(&mut input);
+
+        if input.trim().eq_ignore_ascii_case("q") {
+            println!("Exited VCP recorder.");
+            break;
+        }
+
+        println!("\n[2/2] Scanning monitor registers & comparing with baseline...");
+        let mut changes = Vec::new();
+
+        for code in 0x00u8..=0xFFu8 {
+            let old = baseline.get(&code).copied();
+            let new = mon.get_vcp(code).ok();
+
+            match (old, new) {
+                (Some((old_c, old_m)), Some((new_c, new_m))) => {
+                    if old_c != new_c || old_m != new_m {
+                        changes.push((code, Some(old_c), new_c, new_m));
+                        baseline.insert(code, (new_c, new_m));
+                    }
+                }
+                (None, Some((new_c, new_m))) => {
+                    changes.push((code, None, new_c, new_m));
+                    baseline.insert(code, (new_c, new_m));
+                }
+                _ => {}
+            }
+        }
+
+        if changes.is_empty() {
+            println!("------------------------------------------------------------------------");
+            println!("[!] No register changes detected since baseline.");
+            println!("Tips:");
+            println!("  1. Some monitors only commit DDC/CI changes when you close the OSD menu.");
+            println!("  2. Close the OSD on your monitor and press [ENTER] again to re-check.");
+        } else {
+            println!("========================================================================");
+            println!("🎯 DETECTED HARDWARE VCP CHANGES ({} register(s)):", changes.len());
+            println!("========================================================================");
+            for (code, old_opt, new_c, new_m) in changes {
+                let name = vcp_name(code);
+                if let Some(old_c) = old_opt {
+                    println!("  • Register 0x{code:02X} ({name:<30}): {old_c} -> {new_c} (max: {new_m})");
+                } else {
+                    println!("  • Register 0x{code:02X} ({name:<30}): [New] {new_c} (max: {new_m})");
+                }
+            }
+            println!("========================================================================");
+        }
+    }
+
+    Ok("VCP Recording complete.".to_string())
 }
 
 fn get_waybar_config_string() -> String {

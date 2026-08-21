@@ -116,14 +116,14 @@ Right-click the notification area icon for instant access to cascading hardware 
 
 ## 📦 Installation & Releases
 
-### 🚀 Direct Binary Downloads (v1.2.0)
+### 🚀 Direct Binary Downloads (v1.3.0)
 
 | Platform | Architecture | Binary Package | Description |
 | :--- | :--- | :--- | :--- |
-| **🪟 Windows** | `x86_64` (AMD64) | [**`amctl.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl.exe) \| [`acer_monitor_cli.exe`](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/acer_monitor_cli.exe) | Complete suite: GUI Flyout, System Tray Daemon & CLI |
-| **🐧 Linux** | `x86_64` (amd64) | [**`amctl-linux-x86_64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-x86_64) | Standalone Linux x86_64 CLI & IPC Server |
-| **🐧 Linux** | `aarch64` (ARM64) | [**`amctl-linux-arm64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-arm64) | ARM64 Linux, Raspberry Pi 4/5, SBCs |
-| **🐧 Linux** | `riscv64gc` (RISC-V 64) | [**`amctl-linux-riscv64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-riscv64) | RISC-V 64-bit Linux boards & emulators |
+| **🪟 Windows** | `x86_64` (AMD64) | [**`amctl.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl.exe) \| [**`acer_display_center.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/acer_display_center.exe) \| [`acer_monitor_cli.exe`](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/acer_monitor_cli.exe) | Complete suite: Pure GUI Subsystem Flyout, System Tray Daemon & Console CLI |
+| **🐧 Linux** | `x86_64` (amd64) | [**`amctl-linux-x86_64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-x86_64) | Standalone Linux x86_64 CLI & IPC Server |
+| **🐧 Linux** | `aarch64` (ARM64) | [**`amctl-linux-arm64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-arm64) | ARM64 Linux, Raspberry Pi 4/5, SBCs |
+| **🐧 Linux** | `riscv64gc` (RISC-V 64) | [**`amctl-linux-riscv64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-riscv64) | RISC-V 64-bit Linux boards & emulators |
 
 ---
 
@@ -294,6 +294,28 @@ amctl indicator off            # Turn off front power LED indicator (on | off)
 amctl keylock on               # Lock front panel OSD buttons (on | off)
 amctl unlock                   # Emergency unlock OSD buttons and power button
 amctl reset                    # Factory reset monitor settings
+```
+
+### 🎨 Hardware RGB Gain & Color Calibration
+
+Directly inspect and control the physical Red (`0x16`), Green (`0x18`), and Blue (`0x1A`) hardware gain registers:
+
+```bash
+amctl gain                     # Read current Red, Green, and Blue gain levels
+amctl gain red 75              # Set Red gain to 75%
+amctl gain green 50            # Set Green gain to 50%
+amctl gain blue 50             # Set Blue gain to 50%
+amctl gain 50 50 50            # Set R G B levels in a single atomic command
+amctl gain reset               # Reset hardware RGB Gain back to neutral (50 / 50 / 50)
+amctl bias red 50              # Set Red Bias (Black Level) (0x6C)
+```
+
+### 🕵️ Interactive VCP Register Change Recorder
+
+Discover and map unknown hardware features on **any monitor** by comparing snapshots before and after changing physical OSD settings:
+
+```bash
+amctl record                   # Take baseline snapshot, change OSD on monitor, press Enter to diff
 ```
 
 ### Smooth Fading & Transitions
