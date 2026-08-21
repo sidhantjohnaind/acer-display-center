@@ -19,9 +19,16 @@ Stop-Process -Name amctl,acer_monitor_cli,acer_display_center -Force -ErrorActio
 Start-Sleep -Milliseconds 300
 
 # Find local build or download from GitHub release
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $ScriptDir) { $ScriptDir = $PSScriptRoot }
-if (-not $ScriptDir) { $ScriptDir = (Get-Location).Path }
+$ScriptDir = $null
+if ($MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if (-not $ScriptDir -and $PSScriptRoot) {
+    $ScriptDir = $PSScriptRoot
+}
+if (-not $ScriptDir) {
+    $ScriptDir = (Get-Location).Path
+}
 
 $LocalCandidates = @(
     (Join-Path $ScriptDir "target\release\acer_monitor_cli.exe"),
