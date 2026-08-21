@@ -18,17 +18,31 @@ try {
     Write-Host "[+] Removed Scheduled Task: AcerMonitorIdleDimmer" -ForegroundColor Green
 } catch { }
 
-# 3. Remove Startup auto-launch shortcut
+# 3. Remove Startup auto-launch shortcut and Registry Run key
 $StartupDir = [Environment]::GetFolderPath('Startup')
+$StartupLnk = Join-Path $StartupDir "Acer Display Center.lnk"
 $TrayBatPath = Join-Path $StartupDir "Acer Monitor Tray.bat"
+if (Test-Path $StartupLnk) {
+    Remove-Item -Path $StartupLnk -Force -ErrorAction SilentlyContinue
+    Write-Host "[+] Removed Windows Startup shortcut: $StartupLnk" -ForegroundColor Green
+}
 if (Test-Path $TrayBatPath) {
     Remove-Item -Path $TrayBatPath -Force -ErrorAction SilentlyContinue
     Write-Host "[+] Removed Windows Startup item: $TrayBatPath" -ForegroundColor Green
 }
+try {
+    Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -ErrorAction SilentlyContinue
+    Write-Host "[+] Removed Windows Run registry entry." -ForegroundColor Green
+} catch { }
 
 # 4. Remove Start Menu shortcut
 $StartMenuDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
+$StartShortcut = Join-Path $StartMenuDir "Acer Display Center.lnk"
 $ShortcutPath = Join-Path $StartMenuDir "Acer Monitor Control.bat"
+if (Test-Path $StartShortcut) {
+    Remove-Item -Path $StartShortcut -Force -ErrorAction SilentlyContinue
+    Write-Host "[+] Removed Start Menu shortcut: $StartShortcut" -ForegroundColor Green
+}
 if (Test-Path $ShortcutPath) {
     Remove-Item -Path $ShortcutPath -Force -ErrorAction SilentlyContinue
     Write-Host "[+] Removed Start Menu shortcut: $ShortcutPath" -ForegroundColor Green

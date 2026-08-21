@@ -17,8 +17,14 @@ $IcoTarget = Join-Path $InstallDir "app.ico"
 Stop-Process -Name amctl,acer_monitor_cli -Force -ErrorAction SilentlyContinue
 
 # Find local build or download from GitHub release
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $ScriptDir) { $ScriptDir = $PSScriptRoot }
+if (-not $ScriptDir) { $ScriptDir = (Get-Location).Path }
+
 $LocalCandidates = @(
-    "D:\temp\rust\target\release\acer_monitor_cli.exe",
+    (Join-Path $ScriptDir "target\release\acer_monitor_cli.exe"),
+    (Join-Path $ScriptDir "target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe"),
+    (Join-Path $ScriptDir "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe"),
     "target\release\acer_monitor_cli.exe",
     "target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe",
     "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe"
@@ -78,23 +84,16 @@ if (Test-Path $IcoTarget) { $StartShortcut.IconLocation = "$IcoTarget,0" }
 $StartShortcut.Save()
 Write-Host "[+] Created Start Menu Shortcut: Acer Display Center" -ForegroundColor Green
 
-# Register Startup Daemon (amctl tray)
+# Clean up any legacy Startup folder shortcut to avoid duplicate startup
 $StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
-$StartupShortcut = $WshShell.CreateShortcut((Join-Path $StartupDir "Acer Display Center.lnk"))
-$StartupShortcut.TargetPath = $ExeTarget
-$StartupShortcut.Arguments = "tray"
-$StartupShortcut.WorkingDirectory = $InstallDir
-$StartupShortcut.Description = "Acer Display Center Background System Tray Daemon"
-if (Test-Path $IcoTarget) { $StartupShortcut.IconLocation = "$IcoTarget,0" }
-$StartupShortcut.Save()
-Write-Host "[+] Registered System Tray background daemon at Windows Startup." -ForegroundColor Green
+Remove-Item -Path (Join-Path $StartupDir "Acer Display Center.lnk") -Force -ErrorAction SilentlyContinue
 
-# Also configure Windows Run Registry Key for reliability
+# Configure Windows Run Registry Key for background tray startup
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -Value "`"$ExeTarget`" tray" -Force
-Write-Host "[+] Registered Windows Run registry startup entry." -ForegroundColor Green
+Write-Host "[+] Registered System Tray background daemon at Windows Startup (HKCU Run)." -ForegroundColor Green
 
-# Launch Tray Daemon Now
-Start-Process -FilePath $ExeTarget -ArgumentList "tray" -WindowStyle Hidden
+# Launch Tray Daemon Now (Detached background process)
+Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList "$ExeTarget tray" | Out-Null
 Write-Host "[+] Started Acer Display Center System Tray Daemon!" -ForegroundColor Green
 
 Write-Host ""

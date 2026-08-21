@@ -32,32 +32,45 @@ mod win32_tray {
     static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
     unsafe fn create_custom_monitor_icon() -> HICON {
-        let cx = 16;
-        let cy = 16;
+        let mut cx = windows_sys::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
+            windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON,
+        );
+        let mut cy = windows_sys::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
+            windows_sys::Win32::UI::WindowsAndMessaging::SM_CYSMICON,
+        );
+        if cx <= 0 { cx = 16; }
+        if cy <= 0 { cy = 16; }
+
         let hdc_screen = GetDC(0 as _);
         let hdc_mem = CreateCompatibleDC(hdc_screen);
         let hbm_color = CreateCompatibleBitmap(hdc_screen, cx, cy);
         let hbm_old = SelectObject(hdc_mem, hbm_color as _);
 
-        // Deep Obsidian background
+        // Dark background for contrast
         let rc = windows_sys::Win32::Foundation::RECT { left: 0, top: 0, right: cx, bottom: cy };
-        let hbg = CreateSolidBrush(0x00100C0B);
+        let hbg = CreateSolidBrush(0x001A120E);
         FillRect(hdc_mem, &rc, hbg);
         DeleteObject(hbg as _);
 
-        // Glowing Neon Cyan Monitor Frame
-        let hpen = CreatePen(PS_SOLID as i32, 1, 0x00F8BD38); // #38BDF8
+        // Glowing Neon Cyan Monitor Frame (#38BDF8 -> BGR 0x00F8BD38)
+        let hpen = CreatePen(PS_SOLID as i32, 1, 0x00F8BD38);
         let hold_pen = SelectObject(hdc_mem, hpen as _);
-        let h_mon_brush = CreateSolidBrush(0x001E1812);
+        let h_mon_brush = CreateSolidBrush(0x00D97706); // Amber/Cyan glowing screen
         let hold_brush = SelectObject(hdc_mem, h_mon_brush as _);
 
-        RoundRect(hdc_mem, 1, 1, 15, 12, 3, 3);
+        let pad_x = (cx / 16).max(1);
+        let pad_y = (cy / 16).max(1);
+        let screen_h = cy - pad_y * 5;
+        RoundRect(hdc_mem, pad_x, pad_y, cx - pad_x, screen_h, 2, 2);
 
         // Stand and base
-        MoveToEx(hdc_mem, 7, 12, std::ptr::null_mut());
-        LineTo(hdc_mem, 9, 12);
-        MoveToEx(hdc_mem, 4, 14, std::ptr::null_mut());
-        LineTo(hdc_mem, 12, 14);
+        let mid_x = cx / 2;
+        MoveToEx(hdc_mem, mid_x - 1, screen_h, std::ptr::null_mut());
+        LineTo(hdc_mem, mid_x + 1, screen_h);
+        MoveToEx(hdc_mem, mid_x, screen_h, std::ptr::null_mut());
+        LineTo(hdc_mem, mid_x, cy - pad_y);
+        MoveToEx(hdc_mem, mid_x - pad_x * 3, cy - pad_y, std::ptr::null_mut());
+        LineTo(hdc_mem, mid_x + pad_x * 3 + 1, cy - pad_y);
 
         SelectObject(hdc_mem, hold_brush);
         DeleteObject(h_mon_brush as _);
@@ -67,7 +80,8 @@ mod win32_tray {
         DeleteDC(hdc_mem);
         ReleaseDC(0 as _, hdc_screen);
 
-        let hbm_mask = CreateBitmap(cx, cy, 1, 1, std::ptr::null());
+        let mask_bytes = vec![0u8; (((cx + 15) / 16 * 2) * cy) as usize];
+        let hbm_mask = CreateBitmap(cx, cy, 1, 1, mask_bytes.as_ptr() as _);
         let ii = ICONINFO {
             fIcon: 1,
             xHotspot: 0,
@@ -719,15 +733,26 @@ mod win32_tray {
     }
 
     pub fn run_tray() -> Result<(), String> {
-        println!("Starting Pure Rust Acer Monitor System Tray Daemon (amctl tray)...");
-
         unsafe {
+            windows_sys::Win32::Foundation::SetLastError(0);
+            let mutex_name = to_wide("Local\\AcerDisplayCenterTrayMutex");
+            let mutex_res = windows::Win32::System::Threading::CreateMutexW(
+                None,
+                true,
+                windows::core::PCWSTR(mutex_name.as_ptr()),
+            );
+            if windows_sys::Win32::Foundation::GetLastError() == 183 /* ERROR_ALREADY_EXISTS */ {
+                // Another instance of tray daemon is already active
+                return Ok(());
+            }
+
             let hr = CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32);
             if hr != S_OK && hr != 1 {
                 eprintln!("Note: CoInitializeEx returned 0x{:08X}", hr);
             }
 
             let class_name = to_wide("AcerPureRustTrayClass");
+
             let hinstance = windows_sys::Win32::System::LibraryLoader::GetModuleHandleW(std::ptr::null());
 
             let hicon = create_custom_monitor_icon();
