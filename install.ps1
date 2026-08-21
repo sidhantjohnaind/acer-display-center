@@ -4,7 +4,32 @@ Write-Host "================================================================" -F
 Write-Host "   🚀 Installing Acer Display Center & Monitor CLI Suite (amctl)" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 
-$InstallDir = Join-Path $env:LocalAppData "Programs\acer_monitor_cli"
+# Resolve standard folder paths reliably
+$LocalAppData = $env:LocalAppData
+if (-not $LocalAppData) {
+    $LocalAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+if (-not $LocalAppData -and $env:USERPROFILE) {
+    $LocalAppData = Join-Path $env:USERPROFILE "AppData\Local"
+}
+if (-not $LocalAppData) {
+    $LocalAppData = Join-Path $env:SystemDrive "Users\$env:USERNAME\AppData\Local"
+}
+
+$AppData = $env:AppData
+if (-not $AppData) {
+    $AppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
+}
+if (-not $AppData -and $env:USERPROFILE) {
+    $AppData = Join-Path $env:USERPROFILE "AppData\Roaming"
+}
+
+$DesktopDir = [Environment]::GetFolderPath([Environment+SpecialFolder]::Desktop)
+if (-not $DesktopDir -and $env:USERPROFILE) {
+    $DesktopDir = Join-Path $env:USERPROFILE "Desktop"
+}
+
+$InstallDir = Join-Path $LocalAppData "Programs\acer_monitor_cli"
 if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
@@ -104,8 +129,7 @@ if ($UserPath -notlike "*acer_monitor_cli*") {
 # Create Start Menu & Desktop Shortcuts with Shell.Application COM
 $WshShell = New-Object -ComObject WScript.Shell
 
-$StartMenuDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
-$DesktopDir = [Environment]::GetFolderPath("Desktop")
+$StartMenuDir = Join-Path $AppData "Microsoft\Windows\Start Menu\Programs"
 
 # 1. Main GUI Shortcut (Runs Quick Settings GUI silently with NO console window)
 $GuiShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center.lnk"))
@@ -144,7 +168,7 @@ $TrayDesktopShortcut.Save()
 Write-Host "[+] Created 100% Silent Tray Shortcut: Acer Display Center (Tray Only) (Start Menu & Desktop)" -ForegroundColor Green
 
 # Clean up any legacy Startup folder shortcuts to ensure ONLY the tray runs on boot
-$StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
+$StartupDir = Join-Path $AppData "Microsoft\Windows\Start Menu\Programs\Startup"
 Remove-Item -Path (Join-Path $StartupDir "Acer*.lnk"), (Join-Path $StartupDir "Acer*.bat") -Force -ErrorAction SilentlyContinue
 
 # Configure Windows Run Registry Key: ONLY the background tray runs on boot / startup (Zero console)
