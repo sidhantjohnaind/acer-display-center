@@ -19,29 +19,22 @@ Stop-Process -Name amctl,acer_monitor_cli,acer_display_center -Force -ErrorActio
 Start-Sleep -Milliseconds 300
 
 # Find local build or download from GitHub release
-$ScriptDir = $null
-if ($MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
-    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-}
-if (-not $ScriptDir -and $PSScriptRoot) {
-    $ScriptDir = $PSScriptRoot
-}
-if (-not $ScriptDir) {
-    $ScriptDir = (Get-Location).Path
-}
-
-$LocalCandidates = @(
-    (Join-Path $ScriptDir "target\release\acer_monitor_cli.exe"),
-    (Join-Path $ScriptDir "target\release\amctl.exe"),
-    "target\release\acer_monitor_cli.exe",
-    "target\release\amctl.exe"
-)
+$CandidatePaths = @()
 if ($env:CARGO_TARGET_DIR) {
-    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "release\acer_monitor_cli.exe")
-    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "release\amctl.exe")
+    $CandidatePaths += (Join-Path $env:CARGO_TARGET_DIR "release\acer_monitor_cli.exe")
+    $CandidatePaths += (Join-Path $env:CARGO_TARGET_DIR "release\amctl.exe")
 }
+if (Test-Path "C:\rust-target\release\acer_monitor_cli.exe") {
+    $CandidatePaths += "C:\rust-target\release\acer_monitor_cli.exe"
+}
+if ($PSScriptRoot) {
+    $CandidatePaths += (Join-Path $PSScriptRoot "target\release\acer_monitor_cli.exe")
+    $CandidatePaths += (Join-Path $PSScriptRoot "target\release\amctl.exe")
+}
+$CandidatePaths += "target\release\acer_monitor_cli.exe"
+$CandidatePaths += "target\release\amctl.exe"
 
-$ExistingCandidates = @($LocalCandidates | Where-Object { Test-Path $_ } | Get-Item | Sort-Object LastWriteTime -Descending)
+$ExistingCandidates = @($CandidatePaths | Where-Object { $_ -and (Test-Path $_) } | Get-Item | Sort-Object LastWriteTime -Descending)
 
 $Installed = $false
 if ($ExistingCandidates.Count -gt 0) {
