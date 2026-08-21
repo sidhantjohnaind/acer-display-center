@@ -873,18 +873,190 @@ mod win32_tray {
 #[cfg(windows)]
 pub use win32_tray::*;
 
-#[cfg(not(windows))]
-pub fn run_tray() -> Result<(), String> {
-    Err("System tray is only supported on Windows".into())
+#[cfg(target_os = "linux")]
+mod linux_tray {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use ksni::{Tray, TrayMethods, MenuItem, menu::*};
+
+    static GUI_OPEN: AtomicBool = AtomicBool::new(false);
+
+    pub fn spawn_gui() {
+        if GUI_OPEN.load(Ordering::SeqCst) {
+            return;
+        }
+        GUI_OPEN.store(true, Ordering::SeqCst);
+        std::thread::spawn(|| {
+            let _ = crate::gui::run_gui();
+            GUI_OPEN.store(false, Ordering::SeqCst);
+        });
+    }
+
+    pub fn are_hotkeys_enabled() -> bool {
+        false
+    }
+
+    pub fn set_hotkeys_enabled(_on: bool) {}
+
+    fn cmd(args: &[&str]) {
+        let vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let _ = crate::cli::dispatch_command(vec);
+    }
+
+    struct AcerTray;
+
+    impl Tray for AcerTray {
+        fn id(&self) -> String {
+            "acer-display-center".into()
+        }
+
+        fn title(&self) -> String {
+            "Acer Display Center".into()
+        }
+
+        fn icon_name(&self) -> String {
+            "video-display".into()
+        }
+
+        fn activate(&mut self, _x: i32, _y: i32) {
+            spawn_gui();
+        }
+
+        fn menu(&self) -> Vec<MenuItem<Self>> {
+            vec![
+                StandardItem {
+                    label: "🖥 Open Quick Settings GUI".into(),
+                    activate: Box::new(|_| spawn_gui()),
+                    ..Default::default()
+                }.into(),
+                MenuItem::Separator,
+                SubMenu {
+                    label: "☀ Brightness".into(),
+                    submenu: vec![
+                        StandardItem {
+                            label: "100% (Max)".into(),
+                            activate: Box::new(|_| cmd(&["brightness", "100"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "75%".into(),
+                            activate: Box::new(|_| cmd(&["brightness", "75"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "50% (Balanced)".into(),
+                            activate: Box::new(|_| cmd(&["brightness", "50"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "25% (Night)".into(),
+                            activate: Box::new(|_| cmd(&["brightness", "25"])),
+                            ..Default::default()
+                        }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+                SubMenu {
+                    label: "🎨 Mode Presets".into(),
+                    submenu: vec![
+                        StandardItem {
+                            label: "Standard".into(),
+                            activate: Box::new(|_| cmd(&["preset", "standard"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "Action / Gaming".into(),
+                            activate: Box::new(|_| cmd(&["preset", "action"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "Movie".into(),
+                            activate: Box::new(|_| cmd(&["preset", "movie"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "ECO Mode".into(),
+                            activate: Box::new(|_| cmd(&["preset", "eco"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "Reading".into(),
+                            activate: Box::new(|_| cmd(&["preset", "reading"])),
+                            ..Default::default()
+                        }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+                SubMenu {
+                    label: "⚡ Input Source".into(),
+                    submenu: vec![
+                        StandardItem {
+                            label: "DisplayPort (DP)".into(),
+                            activate: Box::new(|_| cmd(&["input", "dp"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "HDMI 1".into(),
+                            activate: Box::new(|_| cmd(&["input", "hdmi1"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "HDMI 2".into(),
+                            activate: Box::new(|_| cmd(&["input", "hdmi2"])),
+                            ..Default::default()
+                        }.into(),
+                        StandardItem {
+                            label: "USB Type-C".into(),
+                            activate: Box::new(|_| cmd(&["input", "typec"])),
+                            ..Default::default()
+                        }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+                StandardItem {
+                    label: "🌈 Toggle Unified HDR".into(),
+                    activate: Box::new(|_| cmd(&["hdr", "toggle"])),
+                    ..Default::default()
+                }.into(),
+                MenuItem::Separator,
+                StandardItem {
+                    label: "❌ Exit Acer Tray".into(),
+                    activate: Box::new(|_| { std::process::exit(0); }),
+                    ..Default::default()
+                }.into(),
+            ]
+        }
+    }
+
+    pub fn run_tray() -> Result<(), String> {
+        println!("Starting Pure Rust Acer Monitor System Tray (StatusNotifierItem)...");
+        let _handle = AcerTray.spawn();
+
+        println!("● 100% Pure Standalone Rust System Tray active.");
+        println!("● Left-Click -> Opens Frame Studio Quick Settings GUI");
+        println!("● Right-Click -> Shows Menu");
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+pub use linux_tray::*;
+
+#[cfg(not(any(windows, target_os = "linux")))]
+pub fn run_tray() -> Result<(), String> {
+    Err("System tray is not supported on this platform".into())
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn spawn_gui() {}
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn are_hotkeys_enabled() -> bool {
     false
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn set_hotkeys_enabled(_on: bool) {}
+

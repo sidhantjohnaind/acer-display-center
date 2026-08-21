@@ -1,8 +1,0 @@
-{
-  "uuid": "acer-monitor@sidhant",
-  "name": "Acer Monitor Control",
-  "description": "Control Brightness, Contrast, Volume, Presets, Input Sources, Black Boost, and Solar Schedules for Acer DDC/CI Monitors",
-  "shell-version": [ "40", "41", "42", "43", "44", "45", "46", "47" ],
-  "url": "https://github.com/sidhantjohnaind/acer_monitor_cli"
-}
-

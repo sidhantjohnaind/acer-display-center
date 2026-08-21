@@ -89,7 +89,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/amctl server
+ExecStart=/usr/local/bin/amctl tray
 Restart=on-failure
 RestartSec=3
 
@@ -109,9 +109,9 @@ mkdir -p "$AUTOSTART_DIR"
 cat << 'EOF' > "$AUTOSTART_DIR/acer-display-center.desktop"
 [Desktop Entry]
 Type=Application
-Name=Acer Display Center Daemon
-Comment=Acer Monitor Control Background Daemon & Hotkey Listener
-Exec=amctl server
+Name=Acer Display Center Tray Daemon
+Comment=Acer Monitor Control Background Tray & Quick Settings
+Exec=amctl tray
 Icon=display
 Terminal=false
 Categories=Utility;Settings;

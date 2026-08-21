@@ -175,7 +175,7 @@ Run `uninstall.bat` or execute in PowerShell:
 ```bash
 ./uninstall.sh
 ```
-*Stops systemd background services, deletes `/usr/local/bin/amctl` and `~/.local/bin` binaries, and removes desktop shortcuts and GNOME Shell extensions.*
+*Stops systemd background services, deletes `/usr/local/bin/amctl` and `~/.local/bin` binaries, and removes desktop shortcuts and autostart entries.*
 
 
 ### ⚙️ Building from Source
@@ -239,18 +239,16 @@ cargo build --release --target aarch64-pc-windows-msvc
 
 ---
 
-## 🧩 Desktop Widgets & Integrations
+## 🧩 Universal Cross-Platform System Tray & Quick Settings
 
-`amctl` includes native widgets and shortcuts tailored for every desktop environment:
+`amctl` includes a universal, pure Rust System Tray and Quick Settings GUI that works seamlessly across **Windows**, **Linux** (KDE, GNOME, XFCE, Cinnamon, Sway, Hyprland, Waybar), and other desktop environments:
 
-1. **Linux GNOME Shell Quick Settings Extension** (`gnome-extension/`):
-   - Adds sliders and popup submenus for Brightness, Contrast, Volume, Presets, Inputs, Black Boost, and Solar schedule to the top bar.
-   - Install with `./install-gnome-extension.sh`.
+1. **Universal StatusNotifierItem / System Tray (`amctl tray`)**:
+   - Native notification area icon across Windows & Linux with live cascading menus for Brightness, Presets, Inputs, HDR toggle, and Quick Settings.
+   - Zero external runtime library dependencies (100% pure Rust DBus / Win32).
 
-2. **Windows Taskbar System Tray Widget** (`amctl tray` / `acer-tray.ps1`):
-   - Native notification area system tray icon next to the Windows clock.
-   - Run instantly with `amctl tray` (pure Rust, <1.5 MB RAM, sub-millisecond in-memory hardware control).
-   - Middle-click icon to toggle audio mute, double-click to bump brightness +10%, right/left click for full popup menus.
+2. **Frame Studio Quick Settings GUI (`amctl gui`)**:
+   - Sleek dark mode hardware control center with 9 accent color themes, hardware OSD keylock, live sensor graphs, and calibration test patterns.
 
 3. **Rofi / Dmenu Quick Launcher Widget** (`rofi-acer.sh`):
    - Fast keyboard-driven menu for i3, Sway, Hyprland, XFCE, and Openbox window managers.
