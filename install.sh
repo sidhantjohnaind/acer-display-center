@@ -119,20 +119,31 @@ X-GNOME-Autostart-enabled=true
 EOF
 echo "[+] Created XDG autostart entry (~/.config/autostart/acer-display-center.desktop)"
 
-# 6. Install Desktop App Launcher
+# 6. Install Desktop App Launchers (GUI and Tray)
 APP_DIR="$HOME/.local/share/applications"
 mkdir -p "$APP_DIR"
 cat << 'EOF' > "$APP_DIR/acer-display-center.desktop"
 [Desktop Entry]
 Type=Application
 Name=Acer Display Center
-Comment=Acer Monitor Quick Settings & Hardware Control
+Comment=Acer Monitor Quick Settings & System Tray
 Exec=amctl gui
 Icon=display
 Terminal=false
 Categories=Utility;Settings;HardwareSettings;
 EOF
-echo "[+] Created Application Launcher in ~/.local/share/applications"
+
+cat << 'EOF' > "$APP_DIR/acer-display-center-tray.desktop"
+[Desktop Entry]
+Type=Application
+Name=Acer Display Center (Tray Only)
+Comment=Acer Monitor Background System Tray Daemon
+Exec=amctl tray
+Icon=display
+Terminal=false
+Categories=Utility;Settings;
+EOF
+echo "[+] Created Application Launchers (GUI & Tray) in ~/.local/share/applications"
 
 echo ""
 echo "================================================================"

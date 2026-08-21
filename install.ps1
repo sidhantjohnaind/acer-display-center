@@ -75,14 +75,43 @@ if ($UserPath -notlike "*acer_monitor_cli*") {
 $WshShell = New-Object -ComObject WScript.Shell
 
 $StartMenuDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
-$StartShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center.lnk"))
-$StartShortcut.TargetPath = $ExeTarget
-$StartShortcut.Arguments = "gui"
-$StartShortcut.WorkingDirectory = $InstallDir
-$StartShortcut.Description = "Acer Display Center - Monitor Quick Settings"
-if (Test-Path $IcoTarget) { $StartShortcut.IconLocation = "$IcoTarget,0" }
-$StartShortcut.Save()
-Write-Host "[+] Created Start Menu Shortcut: Acer Display Center" -ForegroundColor Green
+$DesktopDir = [Environment]::GetFolderPath("Desktop")
+
+# 1. Main GUI Shortcut (Runs Quick Settings GUI and adds to System Tray)
+$GuiShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center.lnk"))
+$GuiShortcut.TargetPath = $ExeTarget
+$GuiShortcut.Arguments = "gui"
+$GuiShortcut.WorkingDirectory = $InstallDir
+$GuiShortcut.Description = "Acer Display Center - Monitor Quick Settings & System Tray"
+if (Test-Path $IcoTarget) { $GuiShortcut.IconLocation = "$IcoTarget,0" }
+$GuiShortcut.Save()
+
+$GuiDesktopShortcut = $WshShell.CreateShortcut((Join-Path $DesktopDir "Acer Display Center.lnk"))
+$GuiDesktopShortcut.TargetPath = $ExeTarget
+$GuiDesktopShortcut.Arguments = "gui"
+$GuiDesktopShortcut.WorkingDirectory = $InstallDir
+$GuiDesktopShortcut.Description = "Acer Display Center - Monitor Quick Settings & System Tray"
+if (Test-Path $IcoTarget) { $GuiDesktopShortcut.IconLocation = "$IcoTarget,0" }
+$GuiDesktopShortcut.Save()
+Write-Host "[+] Created GUI Shortcut: Acer Display Center (Start Menu & Desktop)" -ForegroundColor Green
+
+# 2. Tray Daemon Shortcut (Background System Tray Daemon)
+$TrayShortcut = $WshShell.CreateShortcut((Join-Path $StartMenuDir "Acer Display Center (Tray Only).lnk"))
+$TrayShortcut.TargetPath = $ExeTarget
+$TrayShortcut.Arguments = "tray"
+$TrayShortcut.WorkingDirectory = $InstallDir
+$TrayShortcut.Description = "Acer Display Center - System Tray Daemon"
+if (Test-Path $IcoTarget) { $TrayShortcut.IconLocation = "$IcoTarget,0" }
+$TrayShortcut.Save()
+
+$TrayDesktopShortcut = $WshShell.CreateShortcut((Join-Path $DesktopDir "Acer Display Center (Tray Only).lnk"))
+$TrayDesktopShortcut.TargetPath = $ExeTarget
+$TrayDesktopShortcut.Arguments = "tray"
+$TrayDesktopShortcut.WorkingDirectory = $InstallDir
+$TrayDesktopShortcut.Description = "Acer Display Center - System Tray Daemon"
+if (Test-Path $IcoTarget) { $TrayDesktopShortcut.IconLocation = "$IcoTarget,0" }
+$TrayDesktopShortcut.Save()
+Write-Host "[+] Created Tray Shortcut: Acer Display Center (Tray Only) (Start Menu & Desktop)" -ForegroundColor Green
 
 # Clean up any legacy Startup folder shortcut to avoid duplicate startup
 $StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"

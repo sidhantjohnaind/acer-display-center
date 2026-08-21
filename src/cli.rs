@@ -6,8 +6,7 @@ use crate::{
 pub fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
-        println!("{}", get_help_string());
-        return Ok(());
+        return launch_gui_with_tray();
     }
 
     let output = dispatch_command(args)?;
@@ -15,6 +14,20 @@ pub fn run() -> Result<(), String> {
         println!("{output}");
     }
     Ok(())
+}
+
+fn launch_gui_with_tray() -> Result<(), String> {
+    std::thread::spawn(|| {
+        let _ = crate::tray::run_tray();
+    });
+    std::thread::sleep(std::time::Duration::from_millis(80));
+    let res = crate::gui::run_gui();
+    if let Err(e) = res {
+        eprintln!("GUI Error: {e}");
+    }
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }
 
 pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
@@ -169,6 +182,11 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             let title = if !args.is_empty() { args.remove(0) } else { "Acer Monitor Report".into() };
             let content = args.join(" ");
             crate::gui::run_report_gui(title, content)?;
+            Ok(String::new())
+        }
+
+        "gui" | "app" | "flyout" => {
+            launch_gui_with_tray()?;
             Ok(String::new())
         }
 
@@ -1015,17 +1033,6 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             }
         }
 
-        "gui" | "flyout" => {
-            #[cfg(windows)]
-            {
-                crate::gui::run_gui()?;
-                Ok("GUI closed.".to_string())
-            }
-            #[cfg(not(windows))]
-            {
-                Err("GUI is currently supported on Windows.".to_string())
-            }
-        }
 
         _ => Err(format!("Unknown command: {cmd}\nUse 'acer_monitor_cli --help' for usage.")),
     }

@@ -35,17 +35,22 @@ try {
     Write-Host "[+] Removed Windows Run registry entry." -ForegroundColor Green
 } catch { }
 
-# 4. Remove Start Menu shortcut
+# 4. Remove Start Menu and Desktop shortcuts
 $StartMenuDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
-$StartShortcut = Join-Path $StartMenuDir "Acer Display Center.lnk"
-$ShortcutPath = Join-Path $StartMenuDir "Acer Monitor Control.bat"
-if (Test-Path $StartShortcut) {
-    Remove-Item -Path $StartShortcut -Force -ErrorAction SilentlyContinue
-    Write-Host "[+] Removed Start Menu shortcut: $StartShortcut" -ForegroundColor Green
-}
-if (Test-Path $ShortcutPath) {
-    Remove-Item -Path $ShortcutPath -Force -ErrorAction SilentlyContinue
-    Write-Host "[+] Removed Start Menu shortcut: $ShortcutPath" -ForegroundColor Green
+$DesktopDir = [Environment]::GetFolderPath("Desktop")
+
+$Shortcuts = @(
+    (Join-Path $StartMenuDir "Acer Display Center.lnk"),
+    (Join-Path $StartMenuDir "Acer Display Center (Tray Only).lnk"),
+    (Join-Path $StartMenuDir "Acer Monitor Control.bat"),
+    (Join-Path $DesktopDir "Acer Display Center.lnk"),
+    (Join-Path $DesktopDir "Acer Display Center (Tray Only).lnk")
+)
+foreach ($sc in $Shortcuts) {
+    if (Test-Path $sc) {
+        Remove-Item -Path $sc -Force -ErrorAction SilentlyContinue
+        Write-Host "[+] Removed shortcut: $sc" -ForegroundColor Green
+    }
 }
 
 # 5. Remove installed binaries and scripts
