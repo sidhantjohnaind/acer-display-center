@@ -38,7 +38,7 @@ curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/
   - [1-Click Web Install](#-1-click-instant-install)
   - [Windows Manual Install](#-windows-install)
   - [Linux AppImage & Source Install](#-linux-install)
-  - [Ubuntu / GNOME Top Bar Extension](#ubuntu--gnome-top-bar-extension)
+  - [Universal Cross-Platform Tray & Widgets](#-universal-cross-platform-system-tray--quick-settings)
 - [🛠️ Usage & Command Reference](#️-usage--command-reference)
   - [Display & Audio Basics](#display--audio-basics)
   - [Hardware Presets & Acer Banked VCP Controls](#hardware-presets--acer-banked-vcp-controls)
@@ -142,7 +142,7 @@ curl -sSL https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/
 Download the binary for your architecture from [Releases](https://github.com/sidhantjohnaind/acer-display-center/releases):
 ```bash
 # Example for x86_64 (amd64):
-wget https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.2.0/amctl-linux-x86_64 -O amctl
+wget https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-x86_64 -O amctl
 chmod +x amctl
 sudo mv amctl /usr/local/bin/
 
