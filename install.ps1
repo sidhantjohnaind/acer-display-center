@@ -15,6 +15,7 @@ $IcoTarget = Join-Path $InstallDir "app.ico"
 
 # Stop any running instances before updating
 Stop-Process -Name amctl,acer_monitor_cli -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
 
 # Find local build or download from GitHub release
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -113,13 +114,13 @@ if (Test-Path $IcoTarget) { $TrayDesktopShortcut.IconLocation = "$IcoTarget,0" }
 $TrayDesktopShortcut.Save()
 Write-Host "[+] Created Tray Shortcut: Acer Display Center (Tray Only) (Start Menu & Desktop)" -ForegroundColor Green
 
-# Clean up any legacy Startup folder shortcut to avoid duplicate startup
+# Clean up any legacy Startup folder shortcuts to ensure ONLY the tray runs on boot
 $StartupDir = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\Startup"
-Remove-Item -Path (Join-Path $StartupDir "Acer Display Center.lnk") -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $StartupDir "Acer*.lnk"), (Join-Path $StartupDir "Acer*.bat") -Force -ErrorAction SilentlyContinue
 
-# Configure Windows Run Registry Key for background tray startup
+# Configure Windows Run Registry Key: ONLY the background tray runs on boot / startup
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AcerDisplayCenter" -Value "`"$ExeTarget`" tray" -Force
-Write-Host "[+] Registered System Tray background daemon at Windows Startup (HKCU Run)." -ForegroundColor Green
+Write-Host "[+] Configured ONLY the System Tray daemon to run on boot / startup (HKCU Run)." -ForegroundColor Green
 
 # Launch Tray Daemon Now (Detached background process)
 Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList "$ExeTarget tray" | Out-Null
