@@ -28,18 +28,24 @@ $LocalCandidates = @(
     (Join-Path $ScriptDir "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe"),
     "target\release\acer_monitor_cli.exe",
     "target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe",
-    "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe"
+    "target\x86_64-pc-windows-gnu\release\acer_monitor_cli.exe",
+    "C:\rust-target\release\acer_monitor_cli.exe",
+    "C:\rust-target\x86_64-pc-windows-msvc\release\acer_monitor_cli.exe"
 )
+if ($env:CARGO_TARGET_DIR) {
+    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "release\acer_monitor_cli.exe")
+    $LocalCandidates += (Join-Path $env:CARGO_TARGET_DIR "x86_64-pc-windows-msvc\release\acer_monitor_cli.exe")
+}
+
+$ExistingCandidates = @($LocalCandidates | Where-Object { Test-Path $_ } | Get-Item | Sort-Object LastWriteTime -Descending)
 
 $Installed = $false
-foreach ($cand in $LocalCandidates) {
-    if (Test-Path $cand) {
-        Copy-Item -Path $cand -Destination $ExeTarget -Force
-        Copy-Item -Path $cand -Destination $LegacyExeTarget -Force
-        $Installed = $true
-        Write-Host "[+] Installed local release binary." -ForegroundColor Green
-        break
-    }
+if ($ExistingCandidates.Count -gt 0) {
+    $cand = $ExistingCandidates[0].FullName
+    Copy-Item -Path $cand -Destination $ExeTarget -Force
+    Copy-Item -Path $cand -Destination $LegacyExeTarget -Force
+    $Installed = $true
+    Write-Host "[+] Installed newest local release binary from $cand." -ForegroundColor Green
 }
 
 if (-not $Installed) {
