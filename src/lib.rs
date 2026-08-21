@@ -1,0 +1,15 @@
+pub mod acer;
+pub mod cli;
+pub mod ddc;
+pub mod edid;
+pub mod energy;
+pub mod gui;
+pub mod hdr;
+pub mod hotkeys;
+pub mod idle;
+pub mod monitor;
+pub mod osd;
+pub mod pattern;
+pub mod server;
+pub mod solar;
+pub mod tray;
