@@ -704,7 +704,7 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
             if args.is_empty() {
                 let spec = parse_optional_specifier(&args);
                 let (val, _) = with_monitor(spec, |mon| acer::get_color_temp(mon))?;
-                let name = match val { 0 => "Cool", 1 => "Normal", 2 => "Warm", 3 => "BlueLight", 4 => "User", _ => "Normal" };
+                let name = match val { 0 => "Warm", 1 => "Normal", 2 => "Cool", 3 => "BlueLight", 4 => "User", _ => "Normal" };
                 return Ok(format!("Color Temperature: {name} ({val})"));
             }
             let value = parse_color_temp(&args[0])?;
@@ -1236,12 +1236,12 @@ fn parse_gamma(s: &str) -> Result<u32, String> {
 
 fn parse_color_temp(s: &str) -> Result<u32, String> {
     match s.to_ascii_lowercase().as_str() {
-        "warm" => Ok(0xFFFF),
-        "normal" => Ok(0),
-        "cool" => Ok(1),
-        "bluelight" | "blue-light" | "blue" => Ok(2),
-        "user" | "custom" => Ok(3),
-        _ => Err("Use warm, normal, cool, bluelight, or user".into()),
+        "warm" => Ok(0),
+        "normal" | "std" | "standard" => Ok(1),
+        "cool" => Ok(2),
+        "bluelight" | "blue-light" | "blue" => Ok(3),
+        "user" | "custom" => Ok(4),
+        other => parse_u32(other),
     }
 }
 

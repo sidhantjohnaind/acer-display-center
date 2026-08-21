@@ -20,23 +20,24 @@ mod tray;
 fn main() {
     #[cfg(windows)]
     unsafe {
-        if windows_sys::Win32::System::Console::AttachConsole(
-            windows_sys::Win32::System::Console::ATTACH_PARENT_PROCESS,
-        ) != 0 {
-            use std::os::windows::io::IntoRawHandle;
-            use windows_sys::Win32::System::Console::{
-                SetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
-            };
+        use windows_sys::Win32::System::Console::{
+            AttachConsole, GetStdHandle, SetStdHandle, ATTACH_PARENT_PROCESS,
+            STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+        };
+        use std::os::windows::io::IntoRawHandle;
 
-            if let Ok(conout) = std::fs::OpenOptions::new().write(true).open("CONOUT$") {
-                let handle = conout.into_raw_handle();
-                SetStdHandle(STD_OUTPUT_HANDLE, handle as _);
-                SetStdHandle(STD_ERROR_HANDLE, handle as _);
-            }
-
-            if let Ok(conin) = std::fs::OpenOptions::new().read(true).open("CONIN$") {
-                let handle = conin.into_raw_handle();
-                SetStdHandle(STD_INPUT_HANDLE, handle as _);
+        let out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if out_handle.is_null() || out_handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE as _ {
+            if AttachConsole(ATTACH_PARENT_PROCESS) != 0 {
+                if let Ok(conout) = std::fs::OpenOptions::new().write(true).open("CONOUT$") {
+                    let handle = conout.into_raw_handle();
+                    SetStdHandle(STD_OUTPUT_HANDLE, handle as _);
+                    SetStdHandle(STD_ERROR_HANDLE, handle as _);
+                }
+                if let Ok(conin) = std::fs::OpenOptions::new().read(true).open("CONIN$") {
+                    let handle = conin.into_raw_handle();
+                    SetStdHandle(STD_INPUT_HANDLE, handle as _);
+                }
             }
         }
     }

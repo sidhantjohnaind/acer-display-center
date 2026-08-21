@@ -273,9 +273,9 @@ mod win32_tray {
                 }
                 if let Ok((ct, _)) = crate::acer::get_color_temp(mon) {
                     st.colortemp = match ct {
-                        0 => "Cool",
+                        0 => "Warm",
                         1 => "Normal",
-                        2 => "Warm",
+                        2 => "Cool",
                         3 => "BlueLight",
                         4 => "User",
                         _ => "Normal",
