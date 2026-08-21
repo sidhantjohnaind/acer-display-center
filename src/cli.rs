@@ -72,20 +72,23 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                 other => parse_u32(other)?,
             };
 
+            let is_hdr = val == 11 || preset_name == "hdr" || preset_name == "hdr400";
+
+            // If switching to an SDR preset while Windows OS HDR is active, disable OS HDR first
+            // so the monitor hardware scaler unlocks and actually switches modes.
+            if !is_hdr && crate::hdr::get_os_hdr() {
+                crate::hdr::set_os_hdr(false);
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            } else if is_hdr && !crate::hdr::get_os_hdr() {
+                crate::hdr::set_os_hdr(true);
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+
             with_monitor(spec, |mon| {
                 // Direct hardware Display Mode register (Acer 0xE2)
-                mon.set_vcp(0xE2, val)?;
+                let _ = mon.set_vcp(0xE2, val);
                 Ok(())
             })?;
-
-            // Only synchronize Windows OS HDR if Unified bridge mode is explicitly active
-            if is_unified {
-                if val == 11 || preset_name == "hdr" || preset_name == "hdr400" {
-                    crate::hdr::set_os_hdr(true);
-                } else if crate::hdr::get_os_hdr() {
-                    crate::hdr::set_os_hdr(false);
-                }
-            }
 
             Ok(format!("Applied hardware preset '{preset_name}' (VCP 0xE2 = {val})."))
         }
@@ -715,6 +718,10 @@ pub fn dispatch_command(mut args: Vec<String>) -> Result<String, String> {
                 let (val, _) = with_monitor(spec, |mon| acer::get_color_temp(mon))?;
                 let name = match val { 0 => "Warm", 1 => "Normal", 2 => "Cool", 3 => "BlueLight", 4 => "User", _ => "Normal" };
                 return Ok(format!("Color Temperature: {name} ({val})"));
+            }
+            if crate::hdr::get_os_hdr() {
+                crate::hdr::set_os_hdr(false);
+                std::thread::sleep(std::time::Duration::from_millis(150));
             }
             let value = parse_color_temp(&args[0])?;
             let spec = parse_optional_specifier(&args[1..]);
