@@ -315,6 +315,34 @@ pub fn set_sdr_white_level(percent: u32) -> Result<(), String> {
 
 #[cfg(not(windows))]
 pub fn get_os_hdr() -> bool {
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        if let Ok(desktop) = std::env::var("XDG_CURRENT_DESKTOP") {
+            let d = desktop.to_lowercase();
+            if d.contains("kde") {
+                if let Ok(out) = Command::new("kscreen-doctor").arg("-j").output() {
+                    let text = String::from_utf8_lossy(&out.stdout);
+                    if text.contains("\"hdr\":true") || text.contains("\"hdr\": true") {
+                        return true;
+                    }
+                }
+            } else if d.contains("hyprland") {
+                if let Ok(out) = Command::new("hyprctl").args(&["getoption", "experimental:hdr"]).output() {
+                    let text = String::from_utf8_lossy(&out.stdout);
+                    if text.contains("int: 1") {
+                        return true;
+                    }
+                }
+                if let Ok(out) = Command::new("hyprctl").args(&["monitors", "-j"]).output() {
+                    let text = String::from_utf8_lossy(&out.stdout);
+                    if text.contains("\"hdr\":true") || text.contains("\"hdr\": true") {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
     false
 }
 
@@ -325,7 +353,7 @@ pub fn get_sdr_white_level() -> Option<u32> {
 
 #[cfg(not(windows))]
 pub fn set_sdr_white_level(_percent: u32) -> Result<(), String> {
-    Err("SDR White Level control is only supported on Windows 10/11 HDR".into())
+    Err("SDR White Level slider is a Windows 10/11 CCD feature.".into())
 }
 
 #[cfg(not(windows))]
@@ -344,6 +372,12 @@ pub fn set_os_hdr(_enable: bool) {
                 let status = if _enable { "enable" } else { "disable" };
                 let _ = Command::new("kscreen-doctor")
                     .arg(format!("output.1.hdr.{status}"))
+                    .output();
+                let _ = Command::new("kscreen-doctor")
+                    .arg(format!("output.DP-1.hdr.{status}"))
+                    .output();
+                let _ = Command::new("kscreen-doctor")
+                    .arg(format!("output.HDMI-A-1.hdr.{status}"))
                     .output();
             }
         }
