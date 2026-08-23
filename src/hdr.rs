@@ -157,7 +157,14 @@ pub fn get_os_hdr() -> bool {
             };
 
             if DisplayConfigGetDeviceInfo(&mut info.header) == 0 {
-                if (info.value & 0x2) != 0 {
+                // Windows Display Config API Bitfield:
+                // Bit 0 (0x1): advancedColorSupported
+                // Bit 1 (0x2): advancedColorEnabled (true for both HDR and Windows 11 Auto Color Management / ACM)
+                // Bit 2 (0x4): wideColorEnforced (true for ACM in SDR mode, false for native HDR)
+                // Bit 3 (0x8): advancedColorForceDisabled
+                let advanced_color_enabled = (info.value & 0x2) != 0;
+                let wide_color_enforced = (info.value & 0x4) != 0;
+                if advanced_color_enabled && !wide_color_enforced {
                     return true;
                 }
             }
@@ -168,6 +175,10 @@ pub fn get_os_hdr() -> bool {
 
 #[cfg(windows)]
 pub fn get_sdr_white_level() -> Option<u32> {
+    if !get_os_hdr() {
+        return None;
+    }
+
     use windows::Win32::Devices::Display::{
         DisplayConfigGetDeviceInfo,
         GetDisplayConfigBufferSizes,
@@ -234,6 +245,10 @@ pub fn get_sdr_white_level() -> Option<u32> {
 
 #[cfg(windows)]
 pub fn set_sdr_white_level(percent: u32) -> Result<(), String> {
+    if !get_os_hdr() {
+        return Err("Windows 10/11 HDR is not active.".into());
+    }
+
     use windows::Win32::Devices::Display::{
         DisplayConfigSetDeviceInfo,
         GetDisplayConfigBufferSizes,

@@ -530,6 +530,8 @@ impl AcerQuickSettingsApp {
         };
         let initial_preset = if is_hdr {
             "✨ HDR Game".to_string()
+        } else if settings.last_state.selected_preset.contains("HDR") {
+            "⚡ Standard".to_string()
         } else {
             settings.last_state.selected_preset
         };
