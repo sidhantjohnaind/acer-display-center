@@ -106,6 +106,15 @@ impl GuiSettings {
                 let _ = std::fs::create_dir_all(parent);
             }
             p
+        } else if let Ok(home) = std::env::var("HOME") {
+            let config_dir = std::env::var("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| PathBuf::from(home).join(".config"));
+            let p = config_dir.join("acer_monitor_cli").join("gui_settings.json");
+            if let Some(parent) = p.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            p
         } else {
             PathBuf::from("gui_settings.json")
         }
@@ -440,6 +449,39 @@ impl AcerQuickSettingsApp {
             }
         }
         _cc.egui_ctx.set_fonts(fonts);
+
+        #[cfg(target_os = "linux")]
+        {
+            // Activate window immediately and set UTILITY window type to prevent GNOME "is ready" notification
+            std::thread::spawn(|| {
+                for _ in 0..25 {
+                    std::thread::sleep(Duration::from_millis(40));
+                    if let Ok(output) = std::process::Command::new("xdotool")
+                        .args(&["search", "--name", "Acer Display Center"])
+                        .output()
+                    {
+                        if output.status.success() {
+                            let win_ids = String::from_utf8_lossy(&output.stdout);
+                            for id_str in win_ids.lines() {
+                                let id = id_str.trim();
+                                if !id.is_empty() {
+                                    let _ = std::process::Command::new("xprop")
+                                        .args(&["-id", id, "-f", "_NET_WM_WINDOW_TYPE", "4a", "-set", "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_UTILITY"])
+                                        .output();
+                                    let _ = std::process::Command::new("xdotool")
+                                        .args(&["windowactivate", "--sync", id])
+                                        .status();
+                                    let _ = std::process::Command::new("xdotool")
+                                        .args(&["windowraise", id])
+                                        .status();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         let (tx_cmd, rx_cmd) = channel::<(Vec<String>, Option<u64>)>();
         let (tx_status, rx_status) = channel::<String>();
@@ -2377,6 +2419,66 @@ fn get_tray_popup_pos(width: f32, height: f32) -> Option<Pos2> {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn get_tray_popup_pos(width: f32, _height: f32) -> Option<Pos2> {
+    // 1. Try querying _NET_WORKAREA via xprop (accurately detects top panel height and dock)
+    if let Ok(output) = std::process::Command::new("xprop")
+        .args(&["-root", "_NET_WORKAREA"])
+        .output()
+    {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            if let Some(vals_str) = s.split('=').nth(1) {
+                let nums: Vec<f32> = vals_str
+                    .split(',')
+                    .filter_map(|p| p.trim().parse::<f32>().ok())
+                    .collect();
+                if nums.len() >= 4 {
+                    let work_x = nums[0];
+                    let work_y = nums[1];
+                    let work_w = nums[2];
+                    let x = (work_x + work_w - width - 12.0).max(0.0);
+                    let y = (work_y + 6.0).max(0.0);
+                    return Some(Pos2::new(x, y));
+                }
+            }
+        }
+    }
+
+    // 2. Try querying screen size via xrandr
+    if let Ok(output) = std::process::Command::new("xrandr")
+        .arg("--current")
+        .output()
+    {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            for line in s.lines() {
+                if line.contains("Screen 0:") && line.contains("current") {
+                    let parts: Vec<&str> = line.split("current").collect();
+                    if let Some(res) = parts.get(1) {
+                        let dims: Vec<f32> = res
+                            .split(',')
+                            .next()
+                            .unwrap_or("")
+                            .split('x')
+                            .filter_map(|d| d.trim().parse::<f32>().ok())
+                            .collect();
+                        if dims.len() >= 2 {
+                            let screen_w = dims[0];
+                            let x = (screen_w - width - 16.0).max(0.0);
+                            let y = 38.0; // below top bar
+                            return Some(Pos2::new(x, y));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Default top-right fallback
+    Some(Pos2::new(1920.0 - width - 16.0, 38.0))
+}
+
 pub fn run_gui() -> Result<(), String> {
     #[cfg(windows)]
     unsafe {
@@ -2395,7 +2497,7 @@ pub fn run_gui() -> Result<(), String> {
         .with_always_on_top()
         .with_active(true);
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     if let Some(pos) = get_tray_popup_pos(width, height) {
         builder = builder.with_position(pos);
     }

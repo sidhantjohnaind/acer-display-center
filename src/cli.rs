@@ -32,9 +32,18 @@ fn launch_gui_with_tray() -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        std::thread::spawn(|| {
-            let _ = crate::tray::run_tray();
-        });
+        let is_running = std::process::Command::new("pgrep")
+            .args(&["-f", "amctl.*tray"])
+            .output()
+            .map(|o| o.status.success() && !o.stdout.is_empty())
+            .unwrap_or(false);
+
+        if !is_running {
+            let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("amctl"));
+            let _ = std::process::Command::new(exe)
+                .arg("tray")
+                .spawn();
+        }
     }
 
     crate::gui::run_gui()

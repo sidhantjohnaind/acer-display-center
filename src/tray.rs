@@ -907,19 +907,33 @@ pub use win32_tray::*;
 #[cfg(target_os = "linux")]
 mod linux_tray {
     use std::sync::atomic::{AtomicBool, Ordering};
-    use ksni::{Tray, TrayMethods, MenuItem, menu::*};
-
-    static GUI_OPEN: AtomicBool = AtomicBool::new(false);
+    use ksni::{Tray, MenuItem, menu::*, blocking::TrayMethods};
 
     pub fn spawn_gui() {
-        if GUI_OPEN.load(Ordering::SeqCst) {
-            return;
+        // If window is already open, simply activate and raise it
+        if let Ok(output) = std::process::Command::new("xdotool")
+            .args(&["search", "--name", "Acer Display Center"])
+            .output()
+        {
+            if output.status.success() {
+                let win_ids = String::from_utf8_lossy(&output.stdout);
+                let first_id = win_ids.lines().map(|s| s.trim()).find(|s| !s.is_empty());
+                if let Some(id) = first_id {
+                    let _ = std::process::Command::new("xdotool")
+                        .args(&["windowactivate", "--sync", id])
+                        .status();
+                    let _ = std::process::Command::new("xdotool")
+                        .args(&["windowraise", id])
+                        .status();
+                    return;
+                }
+            }
         }
-        GUI_OPEN.store(true, Ordering::SeqCst);
-        std::thread::spawn(|| {
-            let _ = crate::gui::run_gui();
-            GUI_OPEN.store(false, Ordering::SeqCst);
-        });
+
+        let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("amctl"));
+        let _ = std::process::Command::new(exe)
+            .arg("gui")
+            .spawn();
     }
 
     pub fn are_hotkeys_enabled() -> bool {
@@ -953,104 +967,215 @@ mod linux_tray {
         }
 
         fn menu(&self) -> Vec<MenuItem<Self>> {
+            let hk = crate::hotkeys::HotkeyConfig::load();
             vec![
+                // 1. Open Flyout & Fast Resync
                 StandardItem {
-                    label: "🖥 Open Quick Settings GUI".into(),
+                    label: hk.menu_item("🚀 Open Acer Display Center", &["gui"]),
                     activate: Box::new(|_| spawn_gui()),
                     ..Default::default()
                 }.into(),
-                MenuItem::Separator,
-                SubMenu {
-                    label: "☀ Brightness".into(),
-                    submenu: vec![
-                        StandardItem {
-                            label: "100% (Max)".into(),
-                            activate: Box::new(|_| cmd(&["brightness", "100"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "75%".into(),
-                            activate: Box::new(|_| cmd(&["brightness", "75"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "50% (Balanced)".into(),
-                            activate: Box::new(|_| cmd(&["brightness", "50"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "25% (Night)".into(),
-                            activate: Box::new(|_| cmd(&["brightness", "25"])),
-                            ..Default::default()
-                        }.into(),
-                    ],
-                    ..Default::default()
-                }.into(),
-                SubMenu {
-                    label: "🎨 Mode Presets".into(),
-                    submenu: vec![
-                        StandardItem {
-                            label: "Standard".into(),
-                            activate: Box::new(|_| cmd(&["preset", "standard"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "Action / Gaming".into(),
-                            activate: Box::new(|_| cmd(&["preset", "action"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "Movie".into(),
-                            activate: Box::new(|_| cmd(&["preset", "movie"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "ECO Mode".into(),
-                            activate: Box::new(|_| cmd(&["preset", "eco"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "Reading".into(),
-                            activate: Box::new(|_| cmd(&["preset", "reading"])),
-                            ..Default::default()
-                        }.into(),
-                    ],
-                    ..Default::default()
-                }.into(),
-                SubMenu {
-                    label: "⚡ Input Source".into(),
-                    submenu: vec![
-                        StandardItem {
-                            label: "DisplayPort (DP)".into(),
-                            activate: Box::new(|_| cmd(&["input", "dp"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "HDMI 1".into(),
-                            activate: Box::new(|_| cmd(&["input", "hdmi1"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "HDMI 2".into(),
-                            activate: Box::new(|_| cmd(&["input", "hdmi2"])),
-                            ..Default::default()
-                        }.into(),
-                        StandardItem {
-                            label: "USB Type-C".into(),
-                            activate: Box::new(|_| cmd(&["input", "typec"])),
-                            ..Default::default()
-                        }.into(),
-                    ],
-                    ..Default::default()
-                }.into(),
                 StandardItem {
-                    label: "🌈 Toggle Unified HDR".into(),
-                    activate: Box::new(|_| cmd(&["hdr", "toggle"])),
+                    label: "🔄 Refresh Monitor State Now".into(),
+                    activate: Box::new(|_| cmd(&["info"])),
                     ..Default::default()
                 }.into(),
                 MenuItem::Separator,
+
+                // 2. Picture Presets Submenu
+                SubMenu {
+                    label: "🎮 Picture Presets".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("⚔️ Action (Gaming)", &["preset", "action"]), activate: Box::new(|_| cmd(&["preset", "action"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🏎️ Racing", &["preset", "racing"]), activate: Box::new(|_| cmd(&["preset", "racing"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("⚽ Sports", &["preset", "sports"]), activate: Box::new(|_| cmd(&["preset", "sports"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("⚡ Standard", &["preset", "standard"]), activate: Box::new(|_| cmd(&["preset", "standard"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🌱 ECO Saver", &["preset", "eco"]), activate: Box::new(|_| cmd(&["preset", "eco"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🎨 Graphics / sRGB", &["preset", "graphics"]), activate: Box::new(|_| cmd(&["preset", "graphics"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("✨ HDR Game (Hardware)", &["preset", "hdr"]), activate: Box::new(|_| cmd(&["preset", "hdr"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("👤 User Custom", &["preset", "user"]), activate: Box::new(|_| cmd(&["preset", "user"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 3. Brightness Submenu
+                SubMenu {
+                    label: "☀️ Brightness".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("☀️ Hardware 100% (Max)", &["brightness", "100", "--osd"]), activate: Box::new(|_| cmd(&["brightness", "100", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "☀️ Hardware 75%".into(), activate: Box::new(|_| cmd(&["brightness", "75", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "☀️ Hardware 50%".into(), activate: Box::new(|_| cmd(&["brightness", "50", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "☀️ Hardware 25%".into(), activate: Box::new(|_| cmd(&["brightness", "25", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🌙 Hardware 10% (Night Dim)", &["brightness", "10", "--osd"]), activate: Box::new(|_| cmd(&["brightness", "10", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌙 Hardware 0% (Min)".into(), activate: Box::new(|_| cmd(&["brightness", "0", "--osd"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: hk.menu_item("⬆️ Hardware Brightness +10%", &["brightness", "+10", "--osd"]), activate: Box::new(|_| cmd(&["brightness", "+10", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("⬇️ Hardware Brightness -10%", &["brightness", "-10", "--osd"]), activate: Box::new(|_| cmd(&["brightness", "-10", "--osd"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 4. Contrast Submenu
+                SubMenu {
+                    label: "🌓 Contrast".into(),
+                    submenu: vec![
+                        StandardItem { label: "Contrast 80%".into(), activate: Box::new(|_| cmd(&["contrast", "80", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 70%".into(), activate: Box::new(|_| cmd(&["contrast", "70", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 60%".into(), activate: Box::new(|_| cmd(&["contrast", "60", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 50% (Default)".into(), activate: Box::new(|_| cmd(&["contrast", "50", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 40%".into(), activate: Box::new(|_| cmd(&["contrast", "40", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 30%".into(), activate: Box::new(|_| cmd(&["contrast", "30", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "Contrast 20%".into(), activate: Box::new(|_| cmd(&["contrast", "20", "--osd"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 5. Gaming & Esports Submenu
+                SubMenu {
+                    label: "🎯 Gaming & Esports".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("🎯 AimPoint: Cycle Next", &["aim", "1"]), activate: Box::new(|_| cmd(&["aim", "1"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎯 AimPoint: Off".into(), activate: Box::new(|_| cmd(&["aim", "0"])), ..Default::default() }.into(),
+                        StandardItem { label: "🔴 AimPoint: Red Dot".into(), activate: Box::new(|_| cmd(&["aim", "1"])), ..Default::default() }.into(),
+                        StandardItem { label: "✚ AimPoint: Cross".into(), activate: Box::new(|_| cmd(&["aim", "2"])), ..Default::default() }.into(),
+                        StandardItem { label: "▲ AimPoint: Triangle".into(), activate: Box::new(|_| cmd(&["aim", "3"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: hk.menu_item("📊 Toggle Refresh Rate / FPS HUD", &["refreshnum", "on"]), activate: Box::new(|_| cmd(&["refreshnum", "on"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "⚡ OverDrive: Extreme".into(), activate: Box::new(|_| cmd(&["od", "2"])), ..Default::default() }.into(),
+                        StandardItem { label: "⚡ OverDrive: Normal".into(), activate: Box::new(|_| cmd(&["od", "1"])), ..Default::default() }.into(),
+                        StandardItem { label: "⚡ OverDrive: Off".into(), activate: Box::new(|_| cmd(&["od", "0"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🌑 Black Boost: 0 (Off)".into(), activate: Box::new(|_| cmd(&["blackboost", "0"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌑 Black Boost: 2 (Mild)".into(), activate: Box::new(|_| cmd(&["blackboost", "2"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌑 Black Boost: 5 (Standard)".into(), activate: Box::new(|_| cmd(&["blackboost", "5"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌑 Black Boost: 8 (Enhanced)".into(), activate: Box::new(|_| cmd(&["blackboost", "8"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌑 Black Boost: 10 (Maximum)".into(), activate: Box::new(|_| cmd(&["blackboost", "10"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 6. Color & Eye Shield Submenu
+                SubMenu {
+                    label: "🎨 Color & Eye Shield".into(),
+                    submenu: vec![
+                        SubMenu {
+                            label: "🎨 Hardware RGB Gain".into(),
+                            submenu: vec![
+                                StandardItem { label: "🔴 Red Gain: 100%".into(), activate: Box::new(|_| cmd(&["gain", "red", "100"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔴 Red Gain: 75%".into(), activate: Box::new(|_| cmd(&["gain", "red", "75"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔴 Red Gain: 50% (Default)".into(), activate: Box::new(|_| cmd(&["gain", "red", "50"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔴 Red Gain: 25%".into(), activate: Box::new(|_| cmd(&["gain", "red", "25"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔴 Red Gain +5%".into(), activate: Box::new(|_| cmd(&["gain", "red", "+5"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔴 Red Gain -5%".into(), activate: Box::new(|_| cmd(&["gain", "red", "-5"])), ..Default::default() }.into(),
+                                MenuItem::Separator,
+                                StandardItem { label: "🟢 Green Gain: 100%".into(), activate: Box::new(|_| cmd(&["gain", "green", "100"])), ..Default::default() }.into(),
+                                StandardItem { label: "🟢 Green Gain: 75%".into(), activate: Box::new(|_| cmd(&["gain", "green", "75"])), ..Default::default() }.into(),
+                                StandardItem { label: "🟢 Green Gain: 50% (Default)".into(), activate: Box::new(|_| cmd(&["gain", "green", "50"])), ..Default::default() }.into(),
+                                StandardItem { label: "🟢 Green Gain: 25%".into(), activate: Box::new(|_| cmd(&["gain", "green", "25"])), ..Default::default() }.into(),
+                                StandardItem { label: "🟢 Green Gain +5%".into(), activate: Box::new(|_| cmd(&["gain", "green", "+5"])), ..Default::default() }.into(),
+                                StandardItem { label: "🟢 Green Gain -5%".into(), activate: Box::new(|_| cmd(&["gain", "green", "-5"])), ..Default::default() }.into(),
+                                MenuItem::Separator,
+                                StandardItem { label: "🔵 Blue Gain: 100%".into(), activate: Box::new(|_| cmd(&["gain", "blue", "100"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔵 Blue Gain: 75%".into(), activate: Box::new(|_| cmd(&["gain", "blue", "75"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔵 Blue Gain: 50% (Default)".into(), activate: Box::new(|_| cmd(&["gain", "blue", "50"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔵 Blue Gain: 25%".into(), activate: Box::new(|_| cmd(&["gain", "blue", "25"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔵 Blue Gain +5%".into(), activate: Box::new(|_| cmd(&["gain", "blue", "+5"])), ..Default::default() }.into(),
+                                StandardItem { label: "🔵 Blue Gain -5%".into(), activate: Box::new(|_| cmd(&["gain", "blue", "-5"])), ..Default::default() }.into(),
+                                MenuItem::Separator,
+                                StandardItem { label: "↺ Reset RGB Gain (50 / 50 / 50)".into(), activate: Box::new(|_| cmd(&["gain", "reset"])), ..Default::default() }.into(),
+                            ],
+                            ..Default::default()
+                        }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🛡️ Blue Light: Off".into(), activate: Box::new(|_| cmd(&["bluelight", "0"])), ..Default::default() }.into(),
+                        StandardItem { label: "🛡️ Blue Light: 50% Level 1".into(), activate: Box::new(|_| cmd(&["bluelight", "50"])), ..Default::default() }.into(),
+                        StandardItem { label: "🛡️ Blue Light: 60% Level 2".into(), activate: Box::new(|_| cmd(&["bluelight", "60"])), ..Default::default() }.into(),
+                        StandardItem { label: "🛡️ Blue Light: 70% Level 3".into(), activate: Box::new(|_| cmd(&["bluelight", "70"])), ..Default::default() }.into(),
+                        StandardItem { label: "🛡️ Blue Light: 80% Level 4".into(), activate: Box::new(|_| cmd(&["bluelight", "80"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🌡️ Color Temp: Warm".into(), activate: Box::new(|_| cmd(&["colortemp", "warm"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌡️ Color Temp: Normal".into(), activate: Box::new(|_| cmd(&["colortemp", "normal"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌡️ Color Temp: Cool".into(), activate: Box::new(|_| cmd(&["colortemp", "cool"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌡️ Color Temp: BlueLight".into(), activate: Box::new(|_| cmd(&["colortemp", "bluelight"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌡️ Color Temp: User Custom".into(), activate: Box::new(|_| cmd(&["colortemp", "user"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "📐 Gamma: 2.2 (Default)".into(), activate: Box::new(|_| cmd(&["gamma", "22"])), ..Default::default() }.into(),
+                        StandardItem { label: "📐 Gamma: 2.4 (Darker)".into(), activate: Box::new(|_| cmd(&["gamma", "24"])), ..Default::default() }.into(),
+                        StandardItem { label: "📐 Gamma: 2.0 (Brighter)".into(), activate: Box::new(|_| cmd(&["gamma", "20"])), ..Default::default() }.into(),
+                        StandardItem { label: "📐 Gamma: 1.8".into(), activate: Box::new(|_| cmd(&["gamma", "18"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🎨 Color Space: sRGB".into(), activate: Box::new(|_| cmd(&["colorspace", "sRGB"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎨 Color Space: DCI-P3".into(), activate: Box::new(|_| cmd(&["colorspace", "DCI"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎨 Color Space: Rec.709".into(), activate: Box::new(|_| cmd(&["colorspace", "Rec709"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎨 Color Space: HDR".into(), activate: Box::new(|_| cmd(&["colorspace", "HDR"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎨 Color Space: EBU".into(), activate: Box::new(|_| cmd(&["colorspace", "EBU"])), ..Default::default() }.into(),
+                        StandardItem { label: "🎨 Color Space: SMPTE-C".into(), activate: Box::new(|_| cmd(&["colorspace", "SMPTE-C"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 7. Video Input Submenu
+                SubMenu {
+                    label: "🔌 Input Source".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("🔌 DisplayPort (DP)", &["input", "dp"]), activate: Box::new(|_| cmd(&["input", "dp"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("📺 HDMI 1", &["input", "hdmi1"]), activate: Box::new(|_| cmd(&["input", "hdmi1"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("📺 HDMI 2", &["input", "hdmi2"]), activate: Box::new(|_| cmd(&["input", "hdmi2"])), ..Default::default() }.into(),
+                        StandardItem { label: "⚡ USB Type-C".into(), activate: Box::new(|_| cmd(&["input", "typec"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🔄 Auto Select Input".into(), activate: Box::new(|_| cmd(&["input", "auto"])), ..Default::default() }.into(),
+                        StandardItem { label: "⏭️ Next Input".into(), activate: Box::new(|_| cmd(&["input", "next"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 8. Audio Submenu
+                SubMenu {
+                    label: "🔊 Audio".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("🔇 Toggle Audio Mute", &["mute", "toggle", "--osd"]), activate: Box::new(|_| cmd(&["mute", "toggle", "--osd"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "🔊 Volume 100%".into(), activate: Box::new(|_| cmd(&["volume", "100", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "🔊 Volume 75%".into(), activate: Box::new(|_| cmd(&["volume", "75", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "🔊 Volume 50%".into(), activate: Box::new(|_| cmd(&["volume", "50", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "🔊 Volume 25%".into(), activate: Box::new(|_| cmd(&["volume", "25", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: "🔊 Volume 0%".into(), activate: Box::new(|_| cmd(&["volume", "0", "--osd"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: hk.menu_item("🔊 Volume +10%", &["volume", "+10", "--osd"]), activate: Box::new(|_| cmd(&["volume", "+10", "--osd"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🔉 Volume -10%", &["volume", "-10", "--osd"]), activate: Box::new(|_| cmd(&["volume", "-10", "--osd"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                // 9. Hardware & Power Tools Submenu
+                SubMenu {
+                    label: "🛠️ Hardware Tools & Power".into(),
+                    submenu: vec![
+                        StandardItem { label: hk.menu_item("✨ Toggle Unified HDR", &["hdr", "both", "toggle"]), activate: Box::new(|_| cmd(&["hdr", "toggle"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🔄 Sync All Displays", &["sync"]), activate: Box::new(|_| cmd(&["sync"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: hk.menu_item("🔒 Lock Physical OSD Keys", &["keylock", "on"]), activate: Box::new(|_| cmd(&["keylock", "on"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🔓 Unlock Physical OSD Keys", &["unlock"]), activate: Box::new(|_| cmd(&["unlock"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "💡 Power LED Indicator: ON".into(), activate: Box::new(|_| cmd(&["indicator", "on"])), ..Default::default() }.into(),
+                        StandardItem { label: "💡 Power LED Indicator: OFF".into(), activate: Box::new(|_| cmd(&["indicator", "off"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "☀️ Start Solar Circadian Scheduler".into(), activate: Box::new(|_| cmd(&["solar"])), ..Default::default() }.into(),
+                        StandardItem { label: "🌙 Start Smart Idle Dimmer Daemon".into(), activate: Box::new(|_| cmd(&["idle-dimmer", "--idle-secs", "300", "--dim-to", "10"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "⚡ Live Energy Draw Report".into(), activate: Box::new(|_| cmd(&["energy"])), ..Default::default() }.into(),
+                        StandardItem { label: "📋 Run Diagnostic Scan & EDID".into(), activate: Box::new(|_| cmd(&["diag"])), ..Default::default() }.into(),
+                        MenuItem::Separator,
+                        StandardItem { label: "⚠️ Factory Reset Monitor".into(), activate: Box::new(|_| cmd(&["reset"])), ..Default::default() }.into(),
+                        StandardItem { label: hk.menu_item("🌙 Turn Display Off (Standby DDC/CI)", &["power", "off"]), activate: Box::new(|_| cmd(&["power", "off"])), ..Default::default() }.into(),
+                    ],
+                    ..Default::default()
+                }.into(),
+
+                MenuItem::Separator,
                 StandardItem {
-                    label: "❌ Exit Acer Tray".into(),
+                    label: "❌ Exit Tray Daemon".into(),
                     activate: Box::new(|_| { std::process::exit(0); }),
                     ..Default::default()
                 }.into(),
@@ -1060,7 +1185,14 @@ mod linux_tray {
 
     pub fn run_tray() -> Result<(), String> {
         println!("Starting Pure Rust Acer Monitor System Tray (StatusNotifierItem)...");
-        let _handle = AcerTray.spawn();
+        let _handle = match AcerTray.spawn() {
+            Ok(h) => h,
+            Err(e) => {
+                let err_msg = format!("Failed to initialize StatusNotifierItem system tray: {e:?}");
+                eprintln!("[!] {err_msg}");
+                return Err(err_msg);
+            }
+        };
 
         println!("● 100% Pure Standalone Rust System Tray active.");
         println!("● Left-Click -> Opens Frame Studio Quick Settings GUI");
