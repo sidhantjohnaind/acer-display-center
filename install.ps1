@@ -34,6 +34,7 @@ $ExeTarget = "$InstallDir\amctl.exe"
 $LegacyExeTarget = "$InstallDir\acer_monitor_cli.exe"
 $GuiExeTarget = "$InstallDir\acer_display_center.exe"
 $IcoTarget = "$InstallDir\app.ico"
+$TrayIcoTarget = "$InstallDir\tray.ico"
 
 # 2. Stop running processes
 Stop-Process -Name amctl,acer_monitor_cli,acer_display_center -Force -ErrorAction SilentlyContinue
@@ -114,13 +115,24 @@ if (-not $Installed) {
     }
 }
 
-# 4. Install App Icon
-if (Test-Path "app.ico") {
-    Copy-Item -Path "app.ico" -Destination $IcoTarget -Force
+# 4. Install App and Tray Icons
+$LocalAppIco = @("$PSScriptRoot\app.ico", "app.ico") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($LocalAppIco) {
+    Copy-Item -Path $LocalAppIco -Destination $IcoTarget -Force
 } else {
     try {
         $RawUrl = "https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/app.ico"
         Invoke-WebRequest -Uri $RawUrl -OutFile $IcoTarget -UseBasicParsing
+    } catch {}
+}
+
+$LocalTrayIco = @("$PSScriptRoot\tray.ico", "tray.ico") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($LocalTrayIco) {
+    Copy-Item -Path $LocalTrayIco -Destination $TrayIcoTarget -Force
+} else {
+    try {
+        $RawUrl = "https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/tray.ico"
+        Invoke-WebRequest -Uri $RawUrl -OutFile $TrayIcoTarget -UseBasicParsing
     } catch {}
 }
 
@@ -169,7 +181,7 @@ try {
         $TrayDesktopShortcut.Arguments = "tray"
         $TrayDesktopShortcut.WorkingDirectory = $InstallDir
         $TrayDesktopShortcut.Description = "Acer Display Center - System Tray Daemon"
-        if (Test-Path $IcoTarget) { $TrayDesktopShortcut.IconLocation = "$IcoTarget,0" }
+        if (Test-Path $TrayIcoTarget) { $TrayDesktopShortcut.IconLocation = "$TrayIcoTarget,0" } elseif (Test-Path $IcoTarget) { $TrayDesktopShortcut.IconLocation = "$IcoTarget,0" }
         $TrayDesktopShortcut.Save()
     }
     Write-Host "[+] Created Shortcuts: Acer Display Center (Start Menu & Desktop)" -ForegroundColor Green

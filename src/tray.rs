@@ -44,16 +44,24 @@ mod win32_tray {
         if cx <= 0 { cx = 16; }
         if cy <= 0 { cy = 16; }
 
-        // 1. Try loading app.ico from sibling or install dir
+        // 1. Try loading tray.ico or app.ico from sibling or install dir
         if let Ok(exe) = std::env::current_exe() {
             let candidates = [
+                exe.parent().map(|p| p.join("tray.ico")),
                 exe.parent().map(|p| p.join("app.ico")),
+                std::env::var("LOCALAPPDATA").ok().map(|l| {
+                    std::path::PathBuf::from(l)
+                        .join("Programs")
+                        .join("acer_monitor_cli")
+                        .join("tray.ico")
+                }),
                 std::env::var("LOCALAPPDATA").ok().map(|l| {
                     std::path::PathBuf::from(l)
                         .join("Programs")
                         .join("acer_monitor_cli")
                         .join("app.ico")
                 }),
+                Some(std::path::PathBuf::from("tray.ico")),
                 Some(std::path::PathBuf::from("app.ico")),
             ];
             for cand in candidates.into_iter().flatten() {
@@ -71,6 +79,24 @@ mod win32_tray {
                         return h_ico as HICON;
                     }
                 }
+            }
+        }
+
+        // 2. Embedded high-contrast tray icon fallback
+        let temp_ico = std::env::temp_dir().join("acer_tray_embedded.ico");
+        const EMBEDDED_TRAY_ICO: &[u8] = include_bytes!("../tray.ico");
+        if std::fs::write(&temp_ico, EMBEDDED_TRAY_ICO).is_ok() {
+            let cand_wide = to_wide(&temp_ico.to_string_lossy());
+            let h_ico = LoadImageW(
+                0 as _,
+                cand_wide.as_ptr(),
+                IMAGE_ICON,
+                cx,
+                cy,
+                LR_LOADFROMFILE,
+            );
+            if h_ico != 0 as _ {
+                return h_ico as HICON;
             }
         }
 
