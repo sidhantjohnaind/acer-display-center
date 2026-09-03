@@ -332,7 +332,15 @@ fn probe_hardware_state() -> MonitorStateUpdate {
 
     // 2. Direct DDC/CI Hardware registers
     if let Ok(mut set) = crate::monitor::MonitorSet::enumerate() {
-        if let Some(mon) = set.monitors_mut().first_mut() {
+        let acer_idx = {
+            let list = set.monitors_mut();
+            list.iter().position(|m| {
+                let desc = m.description.to_lowercase();
+                desc.contains("acer") || desc.contains("vg271") || desc.contains("nitro")
+            }).unwrap_or(0)
+        };
+
+        if let Some(mon) = set.monitors_mut().get_mut(acer_idx) {
             update.monitor_name = Some(mon.description.clone());
 
             let mut is_hardware_hdr = false;

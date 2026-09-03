@@ -102,14 +102,17 @@ pub fn get_raw_bank(mon: &mut Monitor, bank: u8, selector: u32) -> Result<(u32, 
     match bank {
         0xE0 => {
             mon.set_vcp(0xE0, selector)?;
+            sleep(Duration::from_millis(40));
             mon.get_vcp(0xE1)
         }
         0xE7 => {
             mon.set_vcp(0xE7, selector)?;
+            sleep(Duration::from_millis(50));
             mon.get_vcp(0xE8)
         }
         0xE9 => {
             mon.set_vcp(0xE9, selector)?;
+            sleep(Duration::from_millis(40));
             mon.get_vcp(0xEA)
         }
         _ => Err(format!("Unsupported bank 0x{bank:02X}; use e0, e7, or e9")),
