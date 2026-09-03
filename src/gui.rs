@@ -1013,18 +1013,28 @@ impl eframe::App for AcerQuickSettingsApp {
             .show(ctx, |ui| {
                 // Header Bar with Drag handle, Sync, Theme Cycler, and Pin
                 let header_rect = ui.horizontal(|ui| {
+                    // Tight horizontal spacing for header bar so titles and actions never collide
+                    ui.spacing_mut().item_spacing.x = 4.0;
+
                     // Left: Logo Dot & Title
                     let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
                     ui.painter().circle_filled(dot_rect.center(), 3.5, accent);
-                    ui.add_space(2.0);
-                    ui.label(egui::RichText::new("ACER DISPLAY CENTER").strong().size(11.5).color(Color32::WHITE));
-                    ui.label(egui::RichText::new("·").size(11.0).color(Color32::from_rgb(70, 75, 90)));
-                    ui.label(egui::RichText::new("VG271U").size(10.5).color(Color32::from_rgb(148, 163, 184)));
+                    ui.add_space(1.0);
+                    ui.label(egui::RichText::new("ACER DISPLAY CENTER").strong().size(11.0).color(Color32::WHITE));
+                    ui.label(egui::RichText::new("·").size(10.5).color(Color32::from_rgb(70, 75, 90)));
+                    let model_str = if self.monitor_name.contains("VG271U") || self.monitor_name.is_empty() || self.monitor_name.starts_with("Connected") {
+                        "VG271U"
+                    } else {
+                        self.monitor_name.split_whitespace().last().unwrap_or("VG271U")
+                    };
+                    ui.label(egui::RichText::new(model_str).strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
 
                     // Right: Actions Cluster (Right-to-Left)
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+
                         // 0. Close [ ✕ ] Button
-                        let (close_rect, close_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
+                        let (close_rect, close_resp) = ui.allocate_exact_size(Vec2::new(22.0, 22.0), egui::Sense::click());
                         let is_close_hov = close_resp.hovered();
                         let close_bg = if is_close_hov { Color32::from_rgb(220, 38, 38) } else { Color32::from_rgb(22, 25, 34) };
                         let close_stroke = if is_close_hov { Stroke::new(1.0, Color32::from_rgb(239, 68, 68)) } else { Stroke::new(1.0, Color32::from_rgb(38, 44, 58)) };
@@ -1052,7 +1062,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         }
 
                         // 1. Pin [ 📌 ] Button (Prevents auto-dismiss)
-                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
+                        let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(22.0, 22.0), egui::Sense::click());
                         let is_pin_hov = pin_resp.hovered();
                         let pin_bg = if self.is_pinned { theme.badge_bg() } else if is_pin_hov { Color32::from_rgb(34, 40, 56) } else { Color32::from_rgb(22, 25, 34) };
                         let pin_stroke = if self.is_pinned { Stroke::new(1.0, accent) } else { Stroke::new(1.0, Color32::from_rgb(38, 44, 58)) };
@@ -1075,9 +1085,9 @@ impl eframe::App for AcerQuickSettingsApp {
                             }
                         }
 
-                        // 2. Low GPU / Monitor FPS Toggle Button [ 🍃 30fps ] vs [ ⚡ Max ]
-                        let fps_lbl = if self.low_gpu_mode { "🍃 30fps" } else { "⚡ Max" };
-                        let (fps_rect, fps_resp) = ui.allocate_exact_size(Vec2::new(48.0, 22.0), egui::Sense::click());
+                        // 2. Low GPU / Monitor FPS Toggle Button [ 🍃 30 ] vs [ ⚡ Max ]
+                        let fps_lbl = if self.low_gpu_mode { "🍃 30" } else { "⚡ Max" };
+                        let (fps_rect, fps_resp) = ui.allocate_exact_size(Vec2::new(44.0, 22.0), egui::Sense::click());
                         let is_fps_hov = fps_resp.hovered();
                         let (fps_bg, fps_stroke, fps_color) = if self.low_gpu_mode {
                             (
@@ -1112,17 +1122,17 @@ impl eframe::App for AcerQuickSettingsApp {
                         }
 
                         // 3. Theme Button with Active Color Circle
-                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(60.0, 22.0), egui::Sense::click());
+                        let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(48.0, 22.0), egui::Sense::click());
                         let is_th_hov = th_resp.hovered();
                         let th_bg = if is_th_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) };
                         ui.painter().rect_filled(th_rect, Rounding::same(4.0), th_bg);
                         ui.painter().rect_stroke(th_rect, Rounding::same(4.0), Stroke::new(1.0, Color32::from_rgb(38, 44, 58)));
-                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 9.0, th_rect.center().y), 3.0, accent);
+                        ui.painter().circle_filled(Pos2::new(th_rect.left() + 8.0, th_rect.center().y), 2.5, accent);
                         ui.painter().text(
-                            Pos2::new(th_rect.left() + 17.0, th_rect.center().y),
+                            Pos2::new(th_rect.left() + 14.0, th_rect.center().y),
                             egui::Align2::LEFT_CENTER,
                             "Theme",
-                            egui::FontId::proportional(10.0),
+                            egui::FontId::proportional(9.5),
                             Color32::WHITE,
                         );
                         if th_resp.clicked() {
@@ -1131,7 +1141,7 @@ impl eframe::App for AcerQuickSettingsApp {
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
-                        // 3. Sync Button with Live Dynamic Spinner (Runs for >= 2.2s so user sees smooth feedback)
+                        // 4. Sync Button with Live Dynamic Spinner (Runs for >= 2.2s so user sees smooth feedback)
                         let min_sync_dur = Duration::from_millis(2200);
                         let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
                         if is_animating_sync {
@@ -1145,7 +1155,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         }
 
                         let (sync_rect, sync_resp) = ui.allocate_exact_size(
-                            Vec2::new(if is_animating_sync { 62.0 } else { 48.0 }, 22.0),
+                            Vec2::new(if is_animating_sync { 54.0 } else { 40.0 }, 22.0),
                             egui::Sense::click(),
                         );
                         let is_sync_hov = sync_resp.hovered();
@@ -2745,12 +2755,12 @@ pub fn run_gui() -> Result<(), String> {
         }
     }
 
-    let width = 420.0;
+    let width = 440.0;
     let height = 690.0;
 
     let mut builder = egui::ViewportBuilder::default()
         .with_inner_size([width, height])
-        .with_min_inner_size([380.0, 620.0])
+        .with_min_inner_size([400.0, 620.0])
         .with_title("Acer Display Center")
         .with_decorations(false)
         .with_resizable(false)
