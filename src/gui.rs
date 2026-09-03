@@ -933,6 +933,34 @@ impl eframe::App for AcerQuickSettingsApp {
 
                     // Right: Actions Cluster (Right-to-Left)
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // 0. Close [ ✕ ] Button
+                        let (close_rect, close_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
+                        let is_close_hov = close_resp.hovered();
+                        let close_bg = if is_close_hov { Color32::from_rgb(220, 38, 38) } else { Color32::from_rgb(22, 25, 34) };
+                        let close_stroke = if is_close_hov { Stroke::new(1.0, Color32::from_rgb(239, 68, 68)) } else { Stroke::new(1.0, Color32::from_rgb(38, 44, 58)) };
+                        let close_color = if is_close_hov { Color32::WHITE } else { Color32::from_rgb(148, 163, 184) };
+
+                        ui.painter().rect_filled(close_rect, Rounding::same(4.0), close_bg);
+                        ui.painter().rect_stroke(close_rect, Rounding::same(4.0), close_stroke);
+                        let pad = 6.5;
+                        ui.painter().line_segment(
+                            [
+                                Pos2::new(close_rect.left() + pad, close_rect.top() + pad),
+                                Pos2::new(close_rect.right() - pad, close_rect.bottom() - pad),
+                            ],
+                            Stroke::new(1.4, close_color),
+                        );
+                        ui.painter().line_segment(
+                            [
+                                Pos2::new(close_rect.left() + pad, close_rect.bottom() - pad),
+                                Pos2::new(close_rect.right() - pad, close_rect.top() + pad),
+                            ],
+                            Stroke::new(1.4, close_color),
+                        );
+                        if close_resp.clicked() {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+
                         // 1. Pin [ 📌 ] Button (Prevents auto-dismiss)
                         let (pin_rect, pin_resp) = ui.allocate_exact_size(Vec2::new(24.0, 22.0), egui::Sense::click());
                         let is_pin_hov = pin_resp.hovered();
