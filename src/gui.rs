@@ -77,10 +77,75 @@ impl Default for CachedMonitorState {
     }
 }
 
+#[cfg(windows)]
+fn detect_monitor_refresh_rate() -> u32 {
+    #[link(name = "user32")]
+    extern "system" {
+        fn EnumDisplaySettingsW(
+            lpszDeviceName: *const u16,
+            iModeNum: u32,
+            lpDevMode: *mut std::ffi::c_void,
+        ) -> i32;
+    }
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct DevModeW {
+        dmDeviceName: [u16; 32],
+        dmSpecVersion: u16,
+        dmDriverVersion: u16,
+        dmSize: u16,
+        dmDriverExtra: u16,
+        dmFields: u32,
+        dmPositionX: i32,
+        dmPositionY: i32,
+        dmDisplayOrientation: u32,
+        dmDisplayFixedOutput: u32,
+        dmColor: i16,
+        dmDuplex: i16,
+        dmYResolution: i16,
+        dmTTOption: i16,
+        dmCollate: i16,
+        dmFormName: [u16; 32],
+        dmLogPixels: u16,
+        dmBitsPerPel: u32,
+        dmPelsWidth: u32,
+        dmPelsHeight: u32,
+        dmDisplayFlags: u32,
+        dmDisplayFrequency: u32,
+        dmICMMethod: u32,
+        dmICMIntent: u32,
+        dmMediaType: u32,
+        dmDitherType: u32,
+        dmReserved1: u32,
+        dmReserved2: u32,
+        dmPanningWidth: u32,
+        dmPanningHeight: u32,
+    }
+
+    unsafe {
+        let mut dm: DevModeW = std::mem::zeroed();
+        dm.dmSize = std::mem::size_of::<DevModeW>() as u16;
+        const ENUM_CURRENT_SETTINGS: u32 = 0xFFFFFFFF;
+        if EnumDisplaySettingsW(std::ptr::null(), ENUM_CURRENT_SETTINGS, &mut dm as *mut _ as *mut _) != 0 {
+            if dm.dmDisplayFrequency >= 30 {
+                return dm.dmDisplayFrequency;
+            }
+        }
+    }
+    144
+}
+
+#[cfg(not(windows))]
+fn detect_monitor_refresh_rate() -> u32 {
+    144
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuiSettings {
     pub theme: AccentTheme,
     pub unified_hdr_bridge: bool,
+    #[serde(default)]
+    pub low_gpu_mode: bool,
     #[serde(default)]
     pub last_state: CachedMonitorState,
 }
@@ -90,6 +155,7 @@ impl Default for GuiSettings {
         Self {
             theme: AccentTheme::CyberCyan,
             unified_hdr_bridge: true,
+            low_gpu_mode: false,
             last_state: CachedMonitorState::default(),
         }
     }
@@ -413,6 +479,8 @@ pub struct AcerQuickSettingsApp {
     last_frame_instant: Instant,
     has_been_focused: bool,
     pub is_pinned: bool,
+    pub low_gpu_mode: bool,
+    pub detected_refresh_rate: u32,
     pub report_modal: Option<(String, String)>,
     rx_report: Receiver<(String, String)>,
 }
@@ -566,6 +634,8 @@ impl AcerQuickSettingsApp {
 
         let past = Instant::now() - Duration::from_secs(10);
         let settings = GuiSettings::load();
+        let detected_refresh_rate = detect_monitor_refresh_rate();
+        let low_gpu_mode = settings.low_gpu_mode;
         let initial_brightness = if is_hdr {
             crate::hdr::get_sdr_white_level().unwrap_or(settings.last_state.brightness)
         } else {
@@ -632,6 +702,8 @@ impl AcerQuickSettingsApp {
             last_frame_instant: Instant::now(),
             has_been_focused: false,
             is_pinned: false,
+            low_gpu_mode,
+            detected_refresh_rate,
             report_modal: None,
             rx_report,
         }
@@ -641,6 +713,7 @@ impl AcerQuickSettingsApp {
         let settings = GuiSettings {
             theme: self.theme,
             unified_hdr_bridge: self.unified_hdr_bridge,
+            low_gpu_mode: self.low_gpu_mode,
             last_state: CachedMonitorState {
                 brightness: self.brightness,
                 contrast: self.contrast,
@@ -700,14 +773,22 @@ impl AcerQuickSettingsApp {
 
 impl eframe::App for AcerQuickSettingsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Strict 15 FPS cap (1000ms / 15fps ≈ 66.6ms)
-        const TARGET_FRAME_DURATION: Duration = Duration::from_millis(66);
-        let elapsed = self.last_frame_instant.elapsed();
-        if elapsed < TARGET_FRAME_DURATION {
-            std::thread::sleep(TARGET_FRAME_DURATION - elapsed);
+        // Frame rate limiter:
+        // - Low GPU Mode ON: strictly capped to 30 FPS (~33.3ms) for ultra-low resource usage
+        // - Low GPU Mode OFF: runs at full native monitor refresh rate (e.g. 180 Hz)
+        if self.low_gpu_mode {
+            const TARGET_FRAME_DURATION: Duration = Duration::from_millis(33);
+            let elapsed = self.last_frame_instant.elapsed();
+            if elapsed < TARGET_FRAME_DURATION {
+                std::thread::sleep(TARGET_FRAME_DURATION - elapsed);
+            }
+            self.last_frame_instant = Instant::now();
+            ctx.request_repaint_after(TARGET_FRAME_DURATION);
+        } else {
+            self.last_frame_instant = Instant::now();
+            let frame_ms = (1000 / self.detected_refresh_rate.max(60)).max(1) as u64;
+            ctx.request_repaint_after(Duration::from_millis(frame_ms));
         }
-        self.last_frame_instant = Instant::now();
-        ctx.request_repaint_after(TARGET_FRAME_DURATION);
 
         // Track when window actually gains focus
         if ctx.input(|i| i.viewport().focused == Some(true)) {
@@ -994,7 +1075,43 @@ impl eframe::App for AcerQuickSettingsApp {
                             }
                         }
 
-                        // 2. Theme Button with Active Color Circle
+                        // 2. Low GPU / Monitor FPS Toggle Button [ 🍃 30fps ] vs [ ⚡ Max ]
+                        let fps_lbl = if self.low_gpu_mode { "🍃 30fps" } else { "⚡ Max" };
+                        let (fps_rect, fps_resp) = ui.allocate_exact_size(Vec2::new(48.0, 22.0), egui::Sense::click());
+                        let is_fps_hov = fps_resp.hovered();
+                        let (fps_bg, fps_stroke, fps_color) = if self.low_gpu_mode {
+                            (
+                                Color32::from_rgb(18, 38, 28),
+                                Stroke::new(1.0, Color32::from_rgb(34, 197, 94)),
+                                Color32::from_rgb(74, 222, 128),
+                            )
+                        } else {
+                            (
+                                if is_fps_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) },
+                                Stroke::new(1.0, if is_fps_hov { accent } else { Color32::from_rgb(38, 44, 58) }),
+                                if is_fps_hov { Color32::WHITE } else { Color32::from_rgb(148, 163, 184) },
+                            )
+                        };
+                        ui.painter().rect_filled(fps_rect, Rounding::same(4.0), fps_bg);
+                        ui.painter().rect_stroke(fps_rect, Rounding::same(4.0), fps_stroke);
+                        ui.painter().text(
+                            fps_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            fps_lbl,
+                            egui::FontId::proportional(9.5),
+                            fps_color,
+                        );
+                        if fps_resp.clicked() {
+                            self.low_gpu_mode = !self.low_gpu_mode;
+                            self.save_settings();
+                            if self.low_gpu_mode {
+                                self.show_toast("Low GPU Mode: Capped at 30 FPS");
+                            } else {
+                                self.show_toast(format!("Low GPU OFF: Native {} Hz Monitor FPS", self.detected_refresh_rate));
+                            }
+                        }
+
+                        // 3. Theme Button with Active Color Circle
                         let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(60.0, 22.0), egui::Sense::click());
                         let is_th_hov = th_resp.hovered();
                         let th_bg = if is_th_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) };
@@ -1018,7 +1135,11 @@ impl eframe::App for AcerQuickSettingsApp {
                         let min_sync_dur = Duration::from_millis(2200);
                         let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
                         if is_animating_sync {
-                            ctx.request_repaint_after(Duration::from_millis(66));
+                            if self.low_gpu_mode {
+                                ctx.request_repaint_after(Duration::from_millis(33));
+                            } else {
+                                ctx.request_repaint();
+                            }
                         } else {
                             self.sync_started_at = None;
                         }
@@ -1267,6 +1388,9 @@ impl eframe::App for AcerQuickSettingsApp {
                         ui.label(egui::RichText::new(format!("Preset: {}", self.selected_preset)).strong().size(9.5).color(accent));
                         ui.label(egui::RichText::new("|").size(9.5).color(Color32::from_rgb(50, 55, 68)));
                         ui.label(egui::RichText::new(&self.status_text).size(9.0).color(Color32::from_rgb(120, 130, 150)));
+                        ui.label(egui::RichText::new("|").size(9.5).color(Color32::from_rgb(50, 55, 68)));
+                        let fps_mode_str = if self.low_gpu_mode { "🍃 30 FPS".to_string() } else { format!("⚡ {} Hz", self.detected_refresh_rate) };
+                        ui.label(egui::RichText::new(fps_mode_str).size(9.0).color(if self.low_gpu_mode { Color32::from_rgb(34, 197, 94) } else { accent }));
                     });
                     ui.separator();
                 });
@@ -1474,6 +1598,91 @@ impl AcerQuickSettingsApp {
                 self.show_toast("Unified HDR Bridge ON (Syncs Windows + Monitor)");
             } else {
                 self.show_toast("Unified HDR Bridge OFF (Monitor Only)");
+            }
+        }
+    }
+
+    fn render_low_gpu_card(&mut self, ui: &mut egui::Ui, accent: Color32) {
+        let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 46.0), egui::Sense::click());
+
+        let is_hovered = resp.hovered();
+        let bg_color = if self.low_gpu_mode {
+            Color32::from_rgba_unmultiplied(16, 185, 129, 28)
+        } else if is_hovered {
+            Color32::from_rgb(22, 26, 34)
+        } else {
+            Color32::from_rgb(16, 19, 26)
+        };
+
+        let stroke_color = if self.low_gpu_mode {
+            Color32::from_rgb(34, 197, 94)
+        } else if is_hovered {
+            Color32::from_rgb(52, 60, 80)
+        } else {
+            Color32::from_rgb(28, 34, 46)
+        };
+
+        let painter = ui.painter();
+        painter.rect(rect, Rounding::same(6.0), bg_color, Stroke::new(1.0, stroke_color));
+
+        // Title and description
+        painter.text(
+            Pos2::new(rect.left() + 12.0, rect.top() + 15.0),
+            egui::Align2::LEFT_CENTER,
+            "🍃 Low GPU Power Saving Mode",
+            egui::FontId::proportional(11.5),
+            Color32::WHITE,
+        );
+        let subtext = if self.low_gpu_mode {
+            "ON: Locked to 30 FPS for near-zero background CPU/GPU usage".to_string()
+        } else {
+            format!("OFF: Uncapped - Running at native monitor refresh rate ({} Hz)", self.detected_refresh_rate)
+        };
+        painter.text(
+            Pos2::new(rect.left() + 12.0, rect.top() + 31.0),
+            egui::Align2::LEFT_CENTER,
+            &subtext,
+            egui::FontId::proportional(9.5),
+            if self.low_gpu_mode { Color32::from_rgb(74, 222, 128) } else { Color32::from_rgb(148, 163, 184) },
+        );
+
+        // Status Pill Badge
+        let (pill_bg, pill_stroke, status_text, status_color) = if self.low_gpu_mode {
+            (
+                Color32::from_rgb(16, 80, 48),
+                Stroke::new(1.0, Color32::from_rgb(34, 197, 94)),
+                "30 FPS [ON]",
+                Color32::WHITE,
+            )
+        } else {
+            (
+                Color32::from_rgb(24, 28, 36),
+                Stroke::new(1.0, Color32::from_rgb(45, 52, 68)),
+                "MAX FPS [OFF]",
+                Color32::from_rgb(148, 163, 184),
+            )
+        };
+
+        let pill_rect = Rect::from_center_size(
+            Pos2::new(rect.right() - 48.0, rect.center().y),
+            Vec2::new(76.0, 22.0),
+        );
+        painter.rect(pill_rect, Rounding::same(4.0), pill_bg, pill_stroke);
+        painter.text(
+            pill_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            status_text,
+            egui::FontId::proportional(9.5),
+            status_color,
+        );
+
+        if resp.clicked() {
+            self.low_gpu_mode = !self.low_gpu_mode;
+            self.save_settings();
+            if self.low_gpu_mode {
+                self.show_toast("Low GPU Mode: Capped at 30 FPS");
+            } else {
+                self.show_toast(format!("Low GPU OFF: Native {} Hz Monitor FPS", self.detected_refresh_rate));
             }
         }
     }
@@ -2098,6 +2307,8 @@ impl AcerQuickSettingsApp {
 
     fn render_tools_tab(&mut self, ui: &mut egui::Ui, accent: Color32) {
         self.render_hdr_card(ui, accent);
+        ui.add_space(4.0);
+        self.render_low_gpu_card(ui, accent);
         ui.add_space(4.0);
         self.render_hotkeys_card(ui, accent);
         ui.add_space(3.0);
