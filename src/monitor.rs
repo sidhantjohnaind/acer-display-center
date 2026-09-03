@@ -562,6 +562,146 @@ mod platform {
         }
     }
 
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct MONITORINFOEXW {
+        cbSize: u32,
+        rcMonitor: RECT,
+        rcWork: RECT,
+        dwFlags: u32,
+        szDevice: [u16; 32],
+    }
+
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct DISPLAY_DEVICEW {
+        cb: u32,
+        DeviceName: [u16; 32],
+        DeviceString: [u16; 128],
+        StateFlags: u32,
+        DeviceID: [u16; 128],
+        DeviceKey: [u16; 128],
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn EnumDisplayDevicesW(
+            lpDevice: *const u16,
+            iDevNum: u32,
+            lpDisplayDevice: *mut DISPLAY_DEVICEW,
+            dwFlags: u32,
+        ) -> i32;
+    }
+
+    #[link(name = "advapi32")]
+    extern "system" {
+        fn RegOpenKeyExW(
+            hKey: isize,
+            lpSubKey: *const u16,
+            ulOptions: u32,
+            samDesired: u32,
+            phkResult: *mut isize,
+        ) -> i32;
+
+        fn RegQueryValueExW(
+            hKey: isize,
+            lpValueName: *const u16,
+            lpReserved: *mut u32,
+            lpType: *mut u32,
+            lpData: *mut u8,
+            lpcbData: *mut u32,
+        ) -> i32;
+
+        fn RegCloseKey(hKey: isize) -> i32;
+    }
+
+    fn parse_edid_model(edid: &[u8]) -> Option<String> {
+        if edid.len() < 128 {
+            return None;
+        }
+        for offset in [54, 72, 90, 108] {
+            if edid.len() < offset + 18 {
+                break;
+            }
+            let block = &edid[offset..offset + 18];
+            if block[0] == 0 && block[1] == 0 && block[2] == 0 && block[3] == 0xFC {
+                let mut name = Vec::new();
+                for &byte in &block[5..18] {
+                    if byte == 0x0A || byte == 0x00 {
+                        break;
+                    }
+                    if byte >= 32 && byte <= 126 {
+                        name.push(byte);
+                    }
+                }
+                let s = String::from_utf8_lossy(&name).trim().to_string();
+                if !s.is_empty() {
+                    return Some(s);
+                }
+            }
+        }
+        None
+    }
+
+    fn get_real_monitor_name(hmon: HMONITOR, fallback: &str) -> String {
+        use windows_sys::Win32::Graphics::Gdi::GetMonitorInfoW;
+        const HKEY_LOCAL_MACHINE: isize = 0x80000002u32 as i32 as isize;
+        const KEY_READ: u32 = 0x20019;
+
+        unsafe {
+            let mut mi: MONITORINFOEXW = std::mem::zeroed();
+            mi.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+            if GetMonitorInfoW(hmon, &mut mi as *mut _ as *mut _) != 0 {
+                let mut dd: DISPLAY_DEVICEW = std::mem::zeroed();
+                dd.cb = std::mem::size_of::<DISPLAY_DEVICEW>() as u32;
+
+                if EnumDisplayDevicesW(mi.szDevice.as_ptr(), 0, &mut dd, 1) != 0 {
+                    let id = String::from_utf16_lossy(&dd.DeviceID)
+                        .trim_matches('\0')
+                        .to_string();
+                    let parts: Vec<&str> = id.split('#').collect();
+                    if parts.len() >= 3 {
+                        let hw_id = parts[1];
+                        let instance_id = parts[2];
+                        let subkey = format!(
+                            "SYSTEM\\CurrentControlSet\\Enum\\DISPLAY\\{}\\{}\\Device Parameters",
+                            hw_id, instance_id
+                        );
+                        let subkey_w: Vec<u16> = subkey.encode_utf16().chain(std::iter::once(0)).collect();
+                        let mut hkey: isize = 0;
+                        if RegOpenKeyExW(HKEY_LOCAL_MACHINE, subkey_w.as_ptr(), 0, KEY_READ, &mut hkey) == 0 {
+                            let val_name: Vec<u16> = "EDID".encode_utf16().chain(std::iter::once(0)).collect();
+                            let mut data = vec![0u8; 1024];
+                            let mut size = data.len() as u32;
+                            let mut val_type = 0u32;
+                            let res = RegQueryValueExW(
+                                hkey,
+                                val_name.as_ptr(),
+                                std::ptr::null_mut(),
+                                &mut val_type,
+                                data.as_mut_ptr(),
+                                &mut size,
+                            );
+                            RegCloseKey(hkey);
+
+                            if res == 0 && size >= 128 {
+                                data.truncate(size as usize);
+                                if let Some(model) = parse_edid_model(&data) {
+                                    if hw_id.starts_with("ACR") && !model.to_lowercase().starts_with("acer") {
+                                        return format!("Acer {}", model);
+                                    } else {
+                                        return model;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        fallback.to_string()
+    }
+
     impl MonitorSet {
         pub fn enumerate() -> Result<Self, String> {
             let mut hmonitors: Vec<HMONITOR> = Vec::new();
@@ -588,9 +728,11 @@ mod platform {
                         return Err(format!("GetPhysicalMonitorsFromHMONITOR failed: {}", last_error()));
                     }
                     for p in &phys {
+                        let generic_desc = wide_to_string(&p.szPhysicalMonitorDescription);
+                        let real_name = get_real_monitor_name(hmonitor, &generic_desc);
                         monitors.push(Monitor {
                             hphysical: p.hPhysicalMonitor,
-                            description: wide_to_string(&p.szPhysicalMonitorDescription),
+                            description: real_name,
                             capabilities: MonitorCapabilities::default(),
                         });
                     }

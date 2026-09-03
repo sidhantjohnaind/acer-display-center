@@ -69,7 +69,7 @@ impl Default for CachedMonitorState {
             gamma: "22".into(),
             color_space: "sRGB".into(),
             selected_input: "DP".into(),
-            monitor_name: "Acer Nitro VG271U".into(),
+            monitor_name: "Acer VG271U M3".into(),
             red_gain: 50,
             green_gain: 50,
             blue_gain: 50,
@@ -1011,6 +1011,18 @@ impl eframe::App for AcerQuickSettingsApp {
                     .inner_margin(Margin::symmetric(14.0, 12.0)),
             )
             .show(ctx, |ui| {
+                let min_sync_dur = Duration::from_millis(2200);
+                let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
+                if is_animating_sync {
+                    if self.low_gpu_mode {
+                        ctx.request_repaint_after(Duration::from_millis(33));
+                    } else {
+                        ctx.request_repaint();
+                    }
+                } else {
+                    self.sync_started_at = None;
+                }
+
                 // Header Bar with Drag handle, Sync, Theme Cycler, and Pin
                 let header_rect = ui.horizontal(|ui| {
                     // Tight horizontal spacing for header bar so titles and actions never collide
@@ -1023,9 +1035,9 @@ impl eframe::App for AcerQuickSettingsApp {
                     ui.label(egui::RichText::new("ACER DISPLAY CENTER").strong().size(11.0).color(Color32::WHITE));
                     ui.label(egui::RichText::new("·").size(10.5).color(Color32::from_rgb(70, 75, 90)));
                     let model_str = if self.monitor_name.contains("VG271U") || self.monitor_name.is_empty() || self.monitor_name.starts_with("Connected") {
-                        "VG271U"
+                        "VG271U M3"
                     } else {
-                        self.monitor_name.split_whitespace().last().unwrap_or("VG271U")
+                        self.monitor_name.split_whitespace().last().unwrap_or("VG271U M3")
                     };
                     ui.label(egui::RichText::new(model_str).strong().size(10.5).color(Color32::from_rgb(148, 163, 184)));
 
@@ -1111,7 +1123,7 @@ impl eframe::App for AcerQuickSettingsApp {
                             egui::FontId::proportional(9.5),
                             fps_color,
                         );
-                        if fps_resp.clicked() {
+                        if fps_resp.clicked() && !is_animating_sync {
                             self.low_gpu_mode = !self.low_gpu_mode;
                             self.save_settings();
                             if self.low_gpu_mode {
@@ -1123,7 +1135,7 @@ impl eframe::App for AcerQuickSettingsApp {
 
                         // 3. Theme Button with Active Color Circle
                         let (th_rect, th_resp) = ui.allocate_exact_size(Vec2::new(48.0, 22.0), egui::Sense::click());
-                        let is_th_hov = th_resp.hovered();
+                        let is_th_hov = th_resp.hovered() && !is_animating_sync;
                         let th_bg = if is_th_hov { Color32::from_rgb(28, 34, 48) } else { Color32::from_rgb(22, 25, 34) };
                         ui.painter().rect_filled(th_rect, Rounding::same(4.0), th_bg);
                         ui.painter().rect_stroke(th_rect, Rounding::same(4.0), Stroke::new(1.0, Color32::from_rgb(38, 44, 58)));
@@ -1135,25 +1147,13 @@ impl eframe::App for AcerQuickSettingsApp {
                             egui::FontId::proportional(9.5),
                             Color32::WHITE,
                         );
-                        if th_resp.clicked() {
+                        if th_resp.clicked() && !is_animating_sync {
                             self.theme = self.theme.next();
                             self.save_settings();
                             self.show_toast(format!("Theme: {}", self.theme.name()));
                         }
 
                         // 4. Sync Button with Live Dynamic Spinner (Runs for >= 2.2s so user sees smooth feedback)
-                        let min_sync_dur = Duration::from_millis(2200);
-                        let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
-                        if is_animating_sync {
-                            if self.low_gpu_mode {
-                                ctx.request_repaint_after(Duration::from_millis(33));
-                            } else {
-                                ctx.request_repaint();
-                            }
-                        } else {
-                            self.sync_started_at = None;
-                        }
-
                         let (sync_rect, sync_resp) = ui.allocate_exact_size(
                             Vec2::new(if is_animating_sync { 54.0 } else { 40.0 }, 22.0),
                             egui::Sense::click(),
@@ -1218,136 +1218,153 @@ impl eframe::App for AcerQuickSettingsApp {
 
                 ui.add_space(8.0);
 
-                if let Some((title, report_body)) = self.report_modal.clone() {
-                    // Inline Report View inside CentralPanel (Zero window overflow)
+                if is_animating_sync {
                     ui.horizontal(|ui| {
                         let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
                         ui.painter().circle_filled(dot_rect.center(), 3.0, accent);
-                        ui.add_space(2.0);
-                        ui.label(egui::RichText::new(&title).strong().size(12.0).color(Color32::WHITE));
-
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.add(
-                                egui::Button::new(egui::RichText::new("✕ Back").size(10.5).color(Color32::WHITE))
-                                    .fill(Color32::from_rgb(34, 40, 56))
-                                    .rounding(Rounding::same(4.0))
-                                    .min_size(Vec2::new(54.0, 22.0)),
-                            ).clicked() {
-                                self.report_modal = None;
-                            }
-
-                            if ui.add(
-                                egui::Button::new(egui::RichText::new("Copy").size(10.5).color(accent))
-                                    .fill(Color32::from_rgb(18, 26, 38))
-                                    .stroke(Stroke::new(1.0, accent))
-                                    .rounding(Rounding::same(4.0))
-                                    .min_size(Vec2::new(48.0, 22.0)),
-                            ).clicked() {
-                                ui.output_mut(|o| o.copied_text = report_body.clone());
-                                self.show_toast("Report copied to clipboard");
-                            }
-                        });
+                        ui.label(
+                            egui::RichText::new("🔄 Syncing monitor hardware... Inputs locked to prevent resets")
+                                .strong()
+                                .size(10.0)
+                                .color(accent),
+                        );
                     });
-
                     ui.add_space(4.0);
-                    ui.separator();
-                    ui.add_space(4.0);
+                }
 
-                    egui::Frame::none()
-                        .fill(Color32::from_rgb(14, 16, 22))
-                        .stroke(Stroke::new(1.0, Color32::from_rgb(28, 34, 46)))
-                        .rounding(Rounding::same(6.0))
-                        .inner_margin(Margin::symmetric(10.0, 8.0))
-                        .show(ui, |ui| {
-                            egui::ScrollArea::vertical()
-                                .max_height(ui.available_height() - 40.0)
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new(&report_body)
-                                            .monospace()
-                                            .size(10.0)
-                                            .color(Color32::from_rgb(215, 225, 240)),
-                                    );
-                                });
+                // Interactive UI elements are disabled during sync so clicks cannot cause resets
+                ui.add_enabled_ui(!is_animating_sync, |ui| {
+                    if let Some((title, report_body)) = self.report_modal.clone() {
+                        // Inline Report View inside CentralPanel (Zero window overflow)
+                        ui.horizontal(|ui| {
+                            let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
+                            ui.painter().circle_filled(dot_rect.center(), 3.0, accent);
+                            ui.add_space(2.0);
+                            ui.label(egui::RichText::new(&title).strong().size(12.0).color(Color32::WHITE));
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.add(
+                                    egui::Button::new(egui::RichText::new("✕ Back").size(10.5).color(Color32::WHITE))
+                                        .fill(Color32::from_rgb(34, 40, 56))
+                                        .rounding(Rounding::same(4.0))
+                                        .min_size(Vec2::new(54.0, 22.0)),
+                                ).clicked() {
+                                    self.report_modal = None;
+                                }
+
+                                if ui.add(
+                                    egui::Button::new(egui::RichText::new("Copy").size(10.5).color(accent))
+                                        .fill(Color32::from_rgb(18, 26, 38))
+                                        .stroke(Stroke::new(1.0, accent))
+                                        .rounding(Rounding::same(4.0))
+                                        .min_size(Vec2::new(48.0, 22.0)),
+                                ).clicked() {
+                                    ui.output_mut(|o| o.copied_text = report_body.clone());
+                                    self.show_toast("Report copied to clipboard");
+                                }
+                            });
                         });
-                } else if self.editing_hotkeys {
-                    self.render_hotkey_editor(ui, accent);
-                } else {
-                    // Pixel-Perfect Segmented Navigation Bar
-                    let tabs = [
-                        (Tab::Display, "☀ Display"),
-                        (Tab::Gaming, "🎯 Gaming"),
-                        (Tab::Color, "🎨 Color"),
-                        (Tab::Tools, "🛠 Tools"),
-                    ];
 
-                    let target_tab_idx = match self.selected_tab {
-                        Tab::Display => 0.0,
-                        Tab::Gaming => 1.0,
-                        Tab::Color => 2.0,
-                        Tab::Tools => 3.0,
-                    };
-                    let anim_tab_idx = ctx.animate_value_with_time(egui::Id::new("tab_anim_pos"), target_tab_idx, 0.16);
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(4.0);
 
-                    let nav_w = ui.available_width();
-                    let nav_h = 30.0;
-                    let (nav_rect, _response) = ui.allocate_exact_size(Vec2::new(nav_w, nav_h), egui::Sense::hover());
+                        egui::Frame::none()
+                            .fill(Color32::from_rgb(14, 16, 22))
+                            .stroke(Stroke::new(1.0, Color32::from_rgb(28, 34, 46)))
+                            .rounding(Rounding::same(6.0))
+                            .inner_margin(Margin::symmetric(10.0, 8.0))
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical()
+                                    .max_height(ui.available_height() - 40.0)
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| {
+                                        ui.label(
+                                            egui::RichText::new(&report_body)
+                                                .monospace()
+                                                .size(10.0)
+                                                .color(Color32::from_rgb(215, 225, 240)),
+                                        );
+                                    });
+                            });
+                    } else if self.editing_hotkeys {
+                        self.render_hotkey_editor(ui, accent);
+                    } else {
+                        // Pixel-Perfect Segmented Navigation Bar
+                        let tabs = [
+                            (Tab::Display, "☀ Display"),
+                            (Tab::Gaming, "🎯 Gaming"),
+                            (Tab::Color, "🎨 Color"),
+                            (Tab::Tools, "🛠 Tools"),
+                        ];
 
-                    // Nav Track Background
-                    ui.painter().rect_filled(nav_rect, Rounding::same(6.0), Color32::from_rgb(15, 18, 24));
-                    ui.painter().rect_stroke(nav_rect, Rounding::same(6.0), Stroke::new(1.0, Color32::from_rgb(28, 34, 46)));
-
-                    let tab_w = (nav_rect.width() - 8.0) / 4.0;
-                    let pill_x = nav_rect.left() + 4.0 + anim_tab_idx * tab_w;
-                    let pill_rect = Rect::from_min_size(Pos2::new(pill_x, nav_rect.top() + 3.0), Vec2::new(tab_w, nav_h - 6.0));
-
-                    // Glowing Active Tab Indicator Pill
-                    ui.painter().rect_filled(pill_rect, Rounding::same(4.0), theme.badge_bg());
-                    ui.painter().rect_stroke(pill_rect, Rounding::same(4.0), Stroke::new(1.0, accent));
-
-                    for (idx, (tab, name)) in tabs.into_iter().enumerate() {
-                        let btn_rect = Rect::from_min_size(
-                            Pos2::new(nav_rect.left() + 4.0 + (idx as f32) * tab_w, nav_rect.top() + 3.0),
-                            Vec2::new(tab_w, nav_h - 6.0),
-                        );
-                        let resp = ui.allocate_rect(btn_rect, egui::Sense::click());
-                        let is_sel = self.selected_tab == tab;
-                        let is_hov = resp.hovered();
-                        let text_color = if is_sel {
-                            Color32::WHITE
-                        } else if is_hov {
-                            Color32::from_rgb(225, 235, 250)
-                        } else {
-                            Color32::from_rgb(148, 163, 184)
+                        let target_tab_idx = match self.selected_tab {
+                            Tab::Display => 0.0,
+                            Tab::Gaming => 1.0,
+                            Tab::Color => 2.0,
+                            Tab::Tools => 3.0,
                         };
+                        let anim_tab_idx = ctx.animate_value_with_time(egui::Id::new("tab_anim_pos"), target_tab_idx, 0.16);
 
-                        let clean_name = name.replace(['\u{FE0F}', '\u{FE0E}'], "");
-                        ui.painter().text(
-                            btn_rect.center(),
-                            egui::Align2::CENTER_CENTER,
-                            clean_name,
-                            egui::FontId::proportional(11.5),
-                            text_color,
-                        );
+                        let nav_w = ui.available_width();
+                        let nav_h = 30.0;
+                        let (nav_rect, _response) = ui.allocate_exact_size(Vec2::new(nav_w, nav_h), egui::Sense::hover());
 
-                        if resp.clicked() {
-                            self.selected_tab = tab;
+                        // Nav Track Background
+                        ui.painter().rect_filled(nav_rect, Rounding::same(6.0), Color32::from_rgb(15, 18, 24));
+                        ui.painter().rect_stroke(nav_rect, Rounding::same(6.0), Stroke::new(1.0, Color32::from_rgb(28, 34, 46)));
+
+                        let tab_w = (nav_rect.width() - 8.0) / 4.0;
+                        let pill_x = nav_rect.left() + 4.0 + anim_tab_idx * tab_w;
+                        let pill_rect = Rect::from_min_size(Pos2::new(pill_x, nav_rect.top() + 3.0), Vec2::new(tab_w, nav_h - 6.0));
+
+                        // Glowing Active Tab Indicator Pill
+                        ui.painter().rect_filled(pill_rect, Rounding::same(4.0), theme.badge_bg());
+                        ui.painter().rect_stroke(pill_rect, Rounding::same(4.0), Stroke::new(1.0, accent));
+
+                        for (idx, (tab, name)) in tabs.into_iter().enumerate() {
+                            let btn_rect = Rect::from_min_size(
+                                Pos2::new(nav_rect.left() + 4.0 + (idx as f32) * tab_w, nav_rect.top() + 3.0),
+                                Vec2::new(tab_w, nav_h - 6.0),
+                            );
+                            let resp = ui.allocate_rect(btn_rect, egui::Sense::click());
+                            let is_sel = self.selected_tab == tab;
+                            let is_hov = resp.hovered();
+                            let text_color = if is_sel {
+                                Color32::WHITE
+                            } else if is_hov {
+                                Color32::from_rgb(225, 235, 250)
+                            } else {
+                                Color32::from_rgb(148, 163, 184)
+                            };
+
+                            let clean_name = name.replace(['\u{FE0F}', '\u{FE0E}'], "");
+                            ui.painter().text(
+                                btn_rect.center(),
+                                egui::Align2::CENTER_CENTER,
+                                clean_name,
+                                egui::FontId::proportional(11.5),
+                                text_color,
+                            );
+
+                            if resp.clicked() {
+                                self.selected_tab = tab;
+                            }
+                        }
+
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(6.0);
+
+                        // Content View for Selected Tab
+                        match self.selected_tab {
+                            Tab::Display => self.render_display_tab(ui, accent),
+                            Tab::Gaming => self.render_gaming_tab(ui, accent),
+                            Tab::Color => self.render_color_tab(ui, accent),
+                            Tab::Tools => self.render_tools_tab(ui, accent),
                         }
                     }
-
-                    ui.add_space(8.0);
-                    ui.separator();
-                    ui.add_space(6.0);
-
-                    // Content View for Selected Tab
-                    match self.selected_tab {
-                        Tab::Display => self.render_display_tab(ui, accent),
-                        Tab::Gaming => self.render_gaming_tab(ui, accent),
-                        Tab::Color => self.render_color_tab(ui, accent),
-                        Tab::Tools => self.render_tools_tab(ui, accent),
-                    }
-                }
+                });
 
                 // Floating Action Toast Capsule
                 if let Some((msg, created)) = &self.toast_message {
