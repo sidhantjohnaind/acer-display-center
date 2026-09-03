@@ -1206,7 +1206,7 @@ impl eframe::App for AcerQuickSettingsApp {
 
                         if sync_resp.clicked() && !is_animating_sync {
                             self.refresh_hardware();
-                            self.show_toast("Refreshing monitor state...");
+                            self.show_toast("Syncing hardware registers (inputs locked)...");
                         }
                     });
                 }).response.rect;
@@ -1218,21 +1218,7 @@ impl eframe::App for AcerQuickSettingsApp {
 
                 ui.add_space(8.0);
 
-                if is_animating_sync {
-                    ui.horizontal(|ui| {
-                        let (dot_rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
-                        ui.painter().circle_filled(dot_rect.center(), 3.0, accent);
-                        ui.label(
-                            egui::RichText::new("🔄 Syncing monitor hardware... Inputs locked to prevent resets")
-                                .strong()
-                                .size(10.0)
-                                .color(accent),
-                        );
-                    });
-                    ui.add_space(4.0);
-                }
-
-                // Interactive UI elements are disabled during sync so clicks cannot cause resets
+                // Interactive UI elements are disabled during sync so clicks cannot cause resets (Zero layout shift)
                 ui.add_enabled_ui(!is_animating_sync, |ui| {
                     if let Some((title, report_body)) = self.report_modal.clone() {
                         // Inline Report View inside CentralPanel (Zero window overflow)
@@ -1414,7 +1400,12 @@ impl eframe::App for AcerQuickSettingsApp {
                         ui.label(egui::RichText::new("|").size(9.5).color(Color32::from_rgb(50, 55, 68)));
                         ui.label(egui::RichText::new(format!("Preset: {}", self.selected_preset)).strong().size(9.5).color(accent));
                         ui.label(egui::RichText::new("|").size(9.5).color(Color32::from_rgb(50, 55, 68)));
-                        ui.label(egui::RichText::new(&self.status_text).size(9.0).color(Color32::from_rgb(120, 130, 150)));
+                        let (status_display, status_color) = if is_animating_sync {
+                            ("🔄 Syncing... (locked)", accent)
+                        } else {
+                            (self.status_text.as_str(), Color32::from_rgb(120, 130, 150))
+                        };
+                        ui.label(egui::RichText::new(status_display).size(9.0).color(status_color));
                         ui.label(egui::RichText::new("|").size(9.5).color(Color32::from_rgb(50, 55, 68)));
                         let fps_mode_str = if self.low_gpu_mode { "🍃 30 FPS".to_string() } else { format!("⚡ {} Hz", self.detected_refresh_rate) };
                         ui.label(egui::RichText::new(fps_mode_str).size(9.0).color(if self.low_gpu_mode { Color32::from_rgb(34, 197, 94) } else { accent }));
