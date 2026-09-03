@@ -116,19 +116,19 @@ Right-click the notification area icon for instant access to cascading hardware 
 
 ## 📦 Installation & Releases
 
-### 🚀 Direct Binary Downloads (v1.3.0)
+### 🚀 Direct Binary Downloads (Latest Release)
 
 | Platform | Architecture | Binary Package | Description |
 | :--- | :--- | :--- | :--- |
-| **🪟 Windows** | `x86_64` (AMD64) | [**`amctl.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl.exe) \| [**`acer_display_center.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/acer_display_center.exe) \| [`acer_monitor_cli.exe`](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/acer_monitor_cli.exe) | Complete suite: Pure GUI Subsystem Flyout, System Tray Daemon & Console CLI |
-| **🐧 Linux** | `x86_64` (amd64) | [**`amctl-linux-x86_64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-x86_64) | Standalone Linux x86_64 CLI & IPC Server |
-| **🐧 Linux** | `aarch64` (ARM64) | [**`amctl-linux-arm64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-arm64) | ARM64 Linux, Raspberry Pi 4/5, SBCs |
-| **🐧 Linux** | `riscv64gc` (RISC-V 64) | [**`amctl-linux-riscv64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/download/v1.3.0/amctl-linux-riscv64) | RISC-V 64-bit Linux boards & emulators |
+| **🪟 Windows** | `x86_64` (AMD64) | [**`acer_display_center.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/acer_display_center.exe) \| [**`amctl.exe`**](https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/amctl.exe) | Complete suite: Pure GUI Subsystem Flyout, System Tray Daemon & Console CLI |
+| **🐧 Linux** | `x86_64` (amd64) | [**`amctl-linux-x86_64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/amctl-linux-x86_64) | Standalone Linux x86_64 CLI & IPC Server |
+| **🐧 Linux** | `aarch64` (ARM64) | [**`amctl-linux-arm64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/amctl-linux-arm64) | ARM64 Linux, Raspberry Pi 4/5, SBCs |
+| **🐧 Linux** | `riscv64gc` (RISC-V 64) | [**`amctl-linux-riscv64`**](https://github.com/sidhantjohnaind/acer-display-center/releases/latest/download/amctl-linux-riscv64) | RISC-V 64-bit Linux boards & emulators |
 
 ---
 
-### 🪟 Windows Install
-Run the 1-click install command or download the latest `.exe` from [Releases](https://github.com/sidhantjohnaind/acer-display-center/releases):
+### 🪟 Windows 1-Click Install
+Open PowerShell and run:
 ```powershell
 irm https://raw.githubusercontent.com/sidhantjohnaind/acer-display-center/main/install.ps1 | iex
 ```
