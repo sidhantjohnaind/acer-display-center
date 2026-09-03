@@ -3,7 +3,7 @@
 
 #[cfg(windows)]
 mod win32_tray {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM, S_OK};
     use windows_sys::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
     use windows_sys::Win32::UI::Shell::{
@@ -15,13 +15,14 @@ mod win32_tray {
         SelectObject, PS_SOLID,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
-        DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos, GetMessageW,
-        LoadIconW, PostQuitMessage, RegisterClassW, SetForegroundWindow, TrackPopupMenuEx,
-        TranslateMessage, HICON, HMENU, ICONINFO, IDI_APPLICATION, MF_POPUP, MF_SEPARATOR,
-        MF_STRING, MSG, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP,
-        WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP,
-        WM_MBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
+        AllowSetForegroundWindow, AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW,
+        DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
+        GetMessageW, LoadIconW, LoadImageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+        SetForegroundWindow, TrackPopupMenuEx, TranslateMessage, HICON, HMENU, ICONINFO,
+        IDI_APPLICATION, IMAGE_ICON, LR_LOADFROMFILE, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG,
+        TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CLOSE,
+        WM_COMMAND, WM_DESTROY, WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_MBUTTONUP,
+        WM_RBUTTONUP, WNDCLASSW,
     };
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
         RegisterHotKey, UnregisterHotKey, MOD_ALT, MOD_CONTROL,
@@ -30,6 +31,8 @@ mod win32_tray {
     const WM_TRAY_CALLBACK: u32 = WM_APP + 101;
     static GUI_OPEN: AtomicBool = AtomicBool::new(false);
     static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+    static LAST_GUI_SPAWN: AtomicU64 = AtomicU64::new(0);
+    static TASKBAR_CREATED_MSG: AtomicU32 = AtomicU32::new(0);
 
     unsafe fn create_custom_monitor_icon() -> HICON {
         let mut cx = windows_sys::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
@@ -40,6 +43,36 @@ mod win32_tray {
         );
         if cx <= 0 { cx = 16; }
         if cy <= 0 { cy = 16; }
+
+        // 1. Try loading app.ico from sibling or install dir
+        if let Ok(exe) = std::env::current_exe() {
+            let candidates = [
+                exe.parent().map(|p| p.join("app.ico")),
+                std::env::var("LOCALAPPDATA").ok().map(|l| {
+                    std::path::PathBuf::from(l)
+                        .join("Programs")
+                        .join("acer_monitor_cli")
+                        .join("app.ico")
+                }),
+                Some(std::path::PathBuf::from("app.ico")),
+            ];
+            for cand in candidates.into_iter().flatten() {
+                if cand.exists() {
+                    let cand_wide = to_wide(&cand.to_string_lossy());
+                    let h_ico = LoadImageW(
+                        0 as _,
+                        cand_wide.as_ptr(),
+                        IMAGE_ICON,
+                        cx,
+                        cy,
+                        LR_LOADFROMFILE,
+                    );
+                    if h_ico != 0 as _ {
+                        return h_ico as HICON;
+                    }
+                }
+            }
+        }
 
         let hdc_screen = GetDC(0 as _);
         let hdc_mem = CreateCompatibleDC(hdc_screen);
@@ -102,6 +135,16 @@ mod win32_tray {
     }
 
     pub fn spawn_gui() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let last = LAST_GUI_SPAWN.load(Ordering::SeqCst);
+        if now_ms.saturating_sub(last) < 1200 {
+            return;
+        }
+        LAST_GUI_SPAWN.store(now_ms, Ordering::SeqCst);
+
         std::thread::spawn(|| {
             unsafe {
                 let title = to_wide("Acer Display Center");
@@ -111,6 +154,8 @@ mod win32_tray {
                     windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(hwnd);
                     return;
                 }
+                // Allow whatever process we launch to take foreground window focus
+                AllowSetForegroundWindow(0xFFFFFFFF /* ASFW_ANY */);
             }
 
             let current = std::env::current_exe().unwrap_or_else(|_| {
@@ -132,20 +177,17 @@ mod win32_tray {
                 current
             };
 
+            let mut cmd = std::process::Command::new(&exe);
+            cmd.arg("gui");
+            if let Some(parent) = exe.parent() {
+                cmd.current_dir(parent);
+            }
             #[cfg(windows)]
             {
                 use std::os::windows::process::CommandExt;
-                let _ = std::process::Command::new(&exe)
-                    .arg("gui")
-                    .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
-                    .spawn();
+                cmd.creation_flags(0x08000000 /* CREATE_NO_WINDOW */);
             }
-            #[cfg(not(windows))]
-            {
-                let _ = std::process::Command::new(&exe)
-                    .arg("gui")
-                    .spawn();
-            }
+            let _ = cmd.spawn();
         });
     }
 
@@ -723,12 +765,36 @@ mod win32_tray {
         }
     }
 
+    unsafe fn re_register_tray_icon(hwnd: HWND) {
+        let hicon = create_custom_monitor_icon();
+        let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+        nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+        nid.hWnd = hwnd;
+        nid.uID = 1001;
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid.uCallbackMessage = WM_TRAY_CALLBACK;
+        nid.hIcon = hicon;
+
+        let tip = "Acer Monitor Control (amctl)\nSingle/Double-Click: Open Quick Settings\nRight-Click: Menu";
+        let tip_wide = to_wide(tip);
+        let len = tip_wide.len().min(nid.szTip.len() - 1);
+        nid.szTip[..len].copy_from_slice(&tip_wide[..len]);
+
+        let _ = Shell_NotifyIconW(NIM_ADD, &nid);
+    }
+
     unsafe extern "system" fn window_proc(
         hwnd: HWND,
         msg: u32,
         wparam: WPARAM,
         lparam: LPARAM,
     ) -> LRESULT {
+        let tb_msg = TASKBAR_CREATED_MSG.load(Ordering::SeqCst);
+        if tb_msg != 0 && msg == tb_msg {
+            re_register_tray_icon(hwnd);
+            return 0;
+        }
+
         match msg {
             WM_TRAY_CALLBACK => {
                 let event = (lparam & 0xFFFF) as u32;
@@ -793,6 +859,9 @@ mod win32_tray {
             if hr != S_OK && hr != 1 {
                 eprintln!("Note: CoInitializeEx returned 0x{:08X}", hr);
             }
+
+            let taskbar_msg = RegisterWindowMessageW(to_wide("TaskbarCreated").as_ptr());
+            TASKBAR_CREATED_MSG.store(taskbar_msg, Ordering::SeqCst);
 
             let class_name = to_wide("AcerPureRustTrayClass");
 

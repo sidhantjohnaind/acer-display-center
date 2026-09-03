@@ -26,6 +26,7 @@ dependencies = [
  "ddc",
  "ddc-i2c",
  "eframe",
+ "image",
  "ksni",
  "serde",
  "serde_json",

@@ -2483,6 +2483,18 @@ pub fn run_gui() -> Result<(), String> {
     #[cfg(windows)]
     unsafe {
         windows_sys::Win32::System::Console::FreeConsole();
+
+        use std::os::windows::ffi::OsStrExt;
+        let title: Vec<u16> = std::ffi::OsStr::new("Acer Display Center")
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let existing = windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(std::ptr::null(), title.as_ptr());
+        if existing != 0 as _ {
+            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(existing, 9 /* SW_RESTORE */);
+            windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(existing);
+            return Ok(());
+        }
     }
 
     let width = 420.0;
@@ -2496,6 +2508,16 @@ pub fn run_gui() -> Result<(), String> {
         .with_resizable(false)
         .with_always_on_top()
         .with_active(true);
+
+    if let Ok(img) = image::load_from_memory(include_bytes!("../assets/acer_display_center.png")) {
+        let rgba = img.to_rgba8();
+        let (w, h) = rgba.dimensions();
+        builder = builder.with_icon(egui::IconData {
+            rgba: rgba.into_raw(),
+            width: w,
+            height: h,
+        });
+    }
 
     #[cfg(any(windows, target_os = "linux"))]
     if let Some(pos) = get_tray_popup_pos(width, height) {

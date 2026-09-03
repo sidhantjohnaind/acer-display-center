@@ -42,26 +42,42 @@ Start-Sleep -Milliseconds 300
 # 3. Check for local build or download pre-compiled release from GitHub
 $Installed = $false
 
-$LocalCandidates = @(
-    "C:\rust-target\release\acer_monitor_cli.exe",
+$CliCand = @(
+    "$env:CARGO_TARGET_DIR\release\amctl.exe",
+    "$env:CARGO_TARGET_DIR\release\acer_monitor_cli.exe",
     "C:\rust-target\release\amctl.exe",
-    "$PSScriptRoot\target\release\acer_monitor_cli.exe",
+    "C:\rust-target\release\acer_monitor_cli.exe",
     "$PSScriptRoot\target\release\amctl.exe",
+    "$PSScriptRoot\target\release\acer_monitor_cli.exe",
+    "target\release\amctl.exe",
     "target\release\acer_monitor_cli.exe",
-    "target\release\amctl.exe"
-)
+    "$PSScriptRoot\dist\amctl.exe",
+    "$PSScriptRoot\dist\acer_monitor_cli.exe",
+    "dist\amctl.exe",
+    "dist\acer_monitor_cli.exe"
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
-foreach ($cand in $LocalCandidates) {
-    if ($cand -and (Test-Path $cand)) {
-        try {
-            Copy-Item -Path $cand -Destination $ExeTarget -Force
-            Copy-Item -Path $cand -Destination $LegacyExeTarget -Force
-            Copy-Item -Path $cand -Destination $GuiExeTarget -Force
-            $Installed = $true
-            Write-Host "[+] Installed newest local release binary from $cand." -ForegroundColor Green
-            break
-        } catch {}
-    }
+$GuiCand = @(
+    "$env:CARGO_TARGET_DIR\release\acer_display_center.exe",
+    "C:\rust-target\release\acer_display_center.exe",
+    "$PSScriptRoot\target\release\acer_display_center.exe",
+    "target\release\acer_display_center.exe",
+    "$PSScriptRoot\dist\acer_display_center.exe",
+    "dist\acer_display_center.exe"
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+if ($CliCand) {
+    try {
+        Copy-Item -Path $CliCand -Destination $ExeTarget -Force
+        Copy-Item -Path $CliCand -Destination $LegacyExeTarget -Force
+        if ($GuiCand) {
+            Copy-Item -Path $GuiCand -Destination $GuiExeTarget -Force
+        } else {
+            Copy-Item -Path $CliCand -Destination $GuiExeTarget -Force
+        }
+        $Installed = $true
+        Write-Host "[+] Installed newest local release binary ($CliCand)." -ForegroundColor Green
+    } catch {}
 }
 
 if (-not $Installed) {
@@ -83,10 +99,16 @@ if (-not $Installed) {
     } catch {
         Write-Host "[!] Could not download pre-built binary. Building locally with Cargo..." -ForegroundColor Yellow
         cargo build --release
-        if (Test-Path "target\release\acer_monitor_cli.exe") {
-            Copy-Item -Path "target\release\acer_monitor_cli.exe" -Destination $ExeTarget -Force
-            Copy-Item -Path "target\release\acer_monitor_cli.exe" -Destination $LegacyExeTarget -Force
-            Copy-Item -Path "target\release\acer_monitor_cli.exe" -Destination $GuiExeTarget -Force
+        $builtCli = @("target\release\amctl.exe", "target\release\acer_monitor_cli.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+        $builtGui = "target\release\acer_display_center.exe"
+        if ($builtCli) {
+            Copy-Item -Path $builtCli -Destination $ExeTarget -Force
+            Copy-Item -Path $builtCli -Destination $LegacyExeTarget -Force
+            if (Test-Path $builtGui) {
+                Copy-Item -Path $builtGui -Destination $GuiExeTarget -Force
+            } else {
+                Copy-Item -Path $builtCli -Destination $GuiExeTarget -Force
+            }
             $Installed = $true
         }
     }
