@@ -190,9 +190,16 @@ if (Test-Path $StartupDir) {
 
 # 9. Launch Tray Daemon Now
 try {
-    Start-Process -FilePath $GuiExeTarget -ArgumentList "tray" -WindowStyle Hidden
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $GuiExeTarget
+    $psi.Arguments = "tray"
+    $psi.WorkingDirectory = $InstallDir
+    $psi.UseShellExecute = $true
+    [System.Diagnostics.Process]::Start($psi) | Out-Null
     Write-Host "[+] Started Acer Display Center System Tray Daemon!" -ForegroundColor Green
-} catch {}
+} catch {
+    Start-Process -FilePath $GuiExeTarget -ArgumentList "tray" -WorkingDirectory $InstallDir
+}
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
