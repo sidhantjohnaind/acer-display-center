@@ -190,13 +190,15 @@ if (Test-Path $StartupDir) {
 
 # 9. Launch Tray Daemon Now
 try {
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $GuiExeTarget
-    $psi.Arguments = "tray"
-    $psi.WorkingDirectory = $InstallDir
-    $psi.UseShellExecute = $true
-    [System.Diagnostics.Process]::Start($psi) | Out-Null
-    Write-Host "[+] Started Acer Display Center System Tray Daemon!" -ForegroundColor Green
+    $res = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = "`"$GuiExeTarget`" tray"
+        CurrentDirectory = $InstallDir
+    }
+    if ($res.ReturnValue -eq 0) {
+        Write-Host "[+] Started Acer Display Center System Tray Daemon (PID $($res.ProcessId))!" -ForegroundColor Green
+    } else {
+        Start-Process -FilePath $GuiExeTarget -ArgumentList "tray" -WorkingDirectory $InstallDir
+    }
 } catch {
     Start-Process -FilePath $GuiExeTarget -ArgumentList "tray" -WorkingDirectory $InstallDir
 }
