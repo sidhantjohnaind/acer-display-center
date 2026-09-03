@@ -410,6 +410,7 @@ pub struct AcerQuickSettingsApp {
     last_user_gg_edit: Instant,
     last_user_bg_edit: Instant,
     created_at: Instant,
+    last_frame_instant: Instant,
     has_been_focused: bool,
     pub is_pinned: bool,
     pub report_modal: Option<(String, String)>,
@@ -628,6 +629,7 @@ impl AcerQuickSettingsApp {
             last_user_gg_edit: past,
             last_user_bg_edit: past,
             created_at: Instant::now(),
+            last_frame_instant: Instant::now(),
             has_been_focused: false,
             is_pinned: false,
             report_modal: None,
@@ -698,7 +700,14 @@ impl AcerQuickSettingsApp {
 
 impl eframe::App for AcerQuickSettingsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint_after(Duration::from_millis(16));
+        // Strict 15 FPS cap (1000ms / 15fps ≈ 66.6ms)
+        const TARGET_FRAME_DURATION: Duration = Duration::from_millis(66);
+        let elapsed = self.last_frame_instant.elapsed();
+        if elapsed < TARGET_FRAME_DURATION {
+            std::thread::sleep(TARGET_FRAME_DURATION - elapsed);
+        }
+        self.last_frame_instant = Instant::now();
+        ctx.request_repaint_after(TARGET_FRAME_DURATION);
 
         // Track when window actually gains focus
         if ctx.input(|i| i.viewport().focused == Some(true)) {
@@ -1009,7 +1018,7 @@ impl eframe::App for AcerQuickSettingsApp {
                         let min_sync_dur = Duration::from_millis(2200);
                         let is_animating_sync = self.is_syncing || self.sync_started_at.map(|t| t.elapsed() < min_sync_dur).unwrap_or(false);
                         if is_animating_sync {
-                            ctx.request_repaint();
+                            ctx.request_repaint_after(Duration::from_millis(66));
                         } else {
                             self.sync_started_at = None;
                         }
@@ -2570,6 +2579,7 @@ pub struct AcerReportApp {
     pub content: String,
     pub copied: bool,
     pub copied_at: Option<Instant>,
+    pub last_frame_instant: Instant,
 }
 
 impl AcerReportApp {
@@ -2579,12 +2589,22 @@ impl AcerReportApp {
             content,
             copied: false,
             copied_at: None,
+            last_frame_instant: Instant::now(),
         }
     }
 }
 
 impl eframe::App for AcerReportApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Strict 15 FPS cap
+        const TARGET_FRAME_DURATION: Duration = Duration::from_millis(66);
+        let elapsed = self.last_frame_instant.elapsed();
+        if elapsed < TARGET_FRAME_DURATION {
+            std::thread::sleep(TARGET_FRAME_DURATION - elapsed);
+        }
+        self.last_frame_instant = Instant::now();
+        ctx.request_repaint_after(TARGET_FRAME_DURATION);
+
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
